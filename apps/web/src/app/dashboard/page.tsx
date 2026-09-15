@@ -48,9 +48,9 @@ type AgentDashboardJob = {
     status: string
     phaseTitle?: string
     taskTitle?: string
-    overall: { percent: number; bar: string; accessibleLabel: string; confidence: 'exact' | 'low' }
-    phase: { percent: number; bar: string; accessibleLabel: string; confidence: 'exact' | 'low' }
-    task: { percent: number; bar: string; accessibleLabel: string; confidence: 'exact' | 'low' }
+    overall: { percent?: number; numerator: number; denominator: number; bar: string; accessibleLabel: string; confidence: 'exact' | 'unknown' }
+    phase: { percent?: number; numerator: number; denominator: number; bar: string; accessibleLabel: string; confidence: 'exact' | 'unknown' }
+    task: { percent?: number; numerator: number; denominator: number; bar: string; accessibleLabel: string; confidence: 'exact' | 'unknown' }
     deltaCount: number
     deltaPercent: number
     currentPosition: string
@@ -799,6 +799,7 @@ function ActiveRunObservabilityPanel({ jobs }: { jobs: AgentDashboardJob[] }) {
   const updatedLabel = activeJob.updatedAt
     ? new Date(activeJob.updatedAt).toLocaleString()
     : 'Unknown'
+  const progressLabel = (item: AgentDashboardJob['compactStatus']['overall']) => item.percent === undefined ? '—' : `${item.percent}%`
 
   return (
     <section className="rounded-lg border border-gray-200 bg-white px-3 py-3 text-xs shadow-sm dark:border-gray-700 dark:bg-gray-900">
@@ -808,7 +809,7 @@ function ActiveRunObservabilityPanel({ jobs }: { jobs: AgentDashboardJob[] }) {
           <p className="mt-0.5 font-medium text-gray-800 dark:text-gray-100">{activeJob.status}</p>
         </div>
         <span className="rounded bg-gray-100 px-1.5 py-0.5 font-mono text-[10px] text-gray-500 dark:bg-gray-800 dark:text-gray-400">
-          {projection.overall.percent}%{projection.deltaCount > 0 ? ` · +${projection.deltaPercent}` : ''}
+          {progressLabel(projection.overall)}{projection.deltaCount > 0 ? ` · +${projection.deltaCount} task${projection.deltaCount === 1 ? '' : 's'}` : ''}
         </span>
       </div>
 
@@ -822,13 +823,13 @@ function ActiveRunObservabilityPanel({ jobs }: { jobs: AgentDashboardJob[] }) {
         </div>
 
         <div className="grid gap-1.5" aria-label="Run progress">
-          {[['Overall', projection.overall], ['Phase', projection.phase], ['Task', projection.task]].map(([label, item]) => {
+          {[['Run overall', projection.overall], ['Run phase', projection.phase], ['Task', projection.task]].map(([label, item]) => {
             const progressItem = item as AgentDashboardJob['compactStatus']['overall']
             return (
               <div key={label as string} className="grid grid-cols-[3.25rem_minmax(0,1fr)_3rem] items-center gap-2 text-[10px]">
                 <span className="uppercase tracking-wide text-gray-400">{label as string}</span>
                 <span className="truncate font-mono text-gray-600 dark:text-gray-300" aria-label={progressItem.accessibleLabel}>{progressItem.bar}</span>
-                <span className="text-right text-gray-600 dark:text-gray-300">{progressItem.percent}%{progressItem.confidence === 'low' ? '~' : ''}</span>
+                <span className="text-right text-gray-600 dark:text-gray-300">{progressLabel(progressItem)}</span>
               </div>
             )
           })}
@@ -896,16 +897,17 @@ function ActiveRunObservabilityPanel({ jobs }: { jobs: AgentDashboardJob[] }) {
 
 function AgentJobCard({ job, busyJobId, onControl }: { job: AgentDashboardJob; busyJobId: string | null; onControl: (job: AgentDashboardJob, action: 'pause' | 'resume' | 'cancel') => void }) {
   const projection = job.compactStatus
+  const progressLabel = (item: AgentDashboardJob['compactStatus']['overall']) => item.percent === undefined ? '—' : `${item.percent}%`
   const tone: StatusTone = job.status === 'failed' || job.status === 'blocked' ? 'bad' : job.status === 'needs_confirmation' || job.status === 'paused' ? 'warn' : job.status === 'completed' ? 'good' : 'neutral'
   return (
     <div className={`rounded-lg px-2.5 py-2 text-xs ${toneBg(tone)}`}>
       <div className="flex items-center justify-between gap-1">
         <span className="font-medium">{projection.repository}: {projection.status}</span>
-        <span className="font-mono text-[10px] opacity-60">{projection.overall.percent}%{projection.deltaCount > 0 ? ` · +${projection.deltaPercent}` : ''}</span>
+        <span className="font-mono text-[10px] opacity-60">{progressLabel(projection.overall)}{projection.deltaCount > 0 ? ` · +${projection.deltaCount} task${projection.deltaCount === 1 ? '' : 's'}` : ''}</span>
       </div>
       <p className="mt-0.5 truncate opacity-75">{projection.currentPosition}</p>
       <p className="mt-1 truncate font-mono text-[10px] opacity-70" aria-label={projection.overall.accessibleLabel}>
-        {projection.overall.bar} {projection.overall.percent}%
+        {projection.overall.bar} {progressLabel(projection.overall)}
       </p>
       {projection.blocker && (
         <p className="mt-1 opacity-75">{projection.blocker}</p>

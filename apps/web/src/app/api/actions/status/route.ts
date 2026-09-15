@@ -107,7 +107,7 @@ export async function GET(request: NextRequest) {
               .slice(0, 20)
           }
         } catch (e) {
-          payload.sources_error = e instanceof Error ? e.message : 'Failed to list sources'
+          throw e
         }
       }
 
@@ -167,7 +167,7 @@ export async function GET(request: NextRequest) {
             }
           }
         } catch (e) {
-          payload.context_error = e instanceof Error ? e.message : 'Failed to get active context'
+          throw e
         }
       }
 

@@ -954,6 +954,7 @@ export function setSourceIndexStatus(
     : undefined
   upsertIndexState(sourceId, {
     ...record,
+    ...(record.indexStatus === 'ready' ? { indexError: undefined, indexFailureCode: undefined } : {}),
     ...(binding || {}),
     ...(record.indexStatus === 'ready' && record.lastIndexedAt ? { sourceRevision: binding?.sourceRevision } : {})
   })

@@ -1,4 +1,5 @@
 import crypto from 'node:crypto'
+import { execFileSync } from 'node:child_process'
 import fs from 'node:fs'
 import path from 'node:path'
 import { getSourcesSafe, getWriteMode, isSourcePathAvailable, loadConfig } from './config'
@@ -10,6 +11,7 @@ import { executeWithWorkbenchAdmission, type WorkbenchAdmissionOptions } from '.
 import { cancelWorkbenchValidationJob, compactWorkbenchValidationJobForPublic, getWorkbenchValidationJob, getWorkbenchValidationJobResultPage, scheduleWorkbenchValidationJob, submitWorkbenchValidationJob } from './workbench-validation-jobs'
 import { runControlledWorkflowMigrationCommand, type MigrationCommandAdapterDependencies } from './n8n-workflow-migration-command-adapter'
 import { createWorkbenchRun, ensureWorkbenchActionRun, getActiveWorkbenchRun, getAgentJob, resumeWorkbenchRun, updateAgentJob, type WorkbenchGoalContext } from './agent-jobs'
+import type { CodexDelegationAdapter } from './external-delegation-adapter'
 import { dispatchWorkbenchGoal, getWorkbenchGoalTerminalResult, type WorkbenchGoalDispatchInput } from './workbench-goal-dispatch'
 import { appendAgentEvent, findOpenApprovalActivity } from './agent-events'
 import { getWorkbenchSession, type WorkbenchSessionStoreOptions } from './workbench-session-store'
@@ -32,6 +34,7 @@ import { PortableOperationError } from './portable-operation-errors'
 import { authorizeContextOperation } from './context-broker'
 import { workbenchSessionIdForRun } from './workbench-run-session'
 import { continuationHintPaths, mergeFollowUpPaths, normalizeFollowUpContext, type WorkbenchContinuationContext } from './workbench-follow-up-context'
+import { routeAdaptiveExecution } from './adaptive-execution-router'
 
 type Payload = Record<string, unknown>
 type RouteResult = { statusCode: number; body: Record<string, unknown> }
@@ -971,7 +974,17 @@ export async function executeWorkbenchCommandMutation(body: Payload, context: Po
   return projectCommandActivity(attachCommandMetadata(admitted.result))
 }
 
-async function apply(body: Payload, context: PortableExecutionContext): Promise<RouteResult> {
+function codexDispatch(adapter: CodexDelegationAdapter | undefined, sourceRoot: string, requestId?: string): { adapter: CodexDelegationAdapter; branch: string; ownerSessionId: string } | undefined {
+  if (!adapter) return undefined
+  const branch = execFileSync('git', ['branch', '--show-current'], { cwd: sourceRoot, encoding: 'utf8', timeout: 3_000, stdio: ['ignore', 'pipe', 'pipe'] }).trim()
+  return {
+    adapter,
+    branch,
+    ownerSessionId: `workbench-run:${requestId || 'native'}`
+  }
+}
+
+async function apply(body: Payload, context: PortableExecutionContext, options: { codexAvailable?: boolean | (() => boolean); codex?: CodexDelegationAdapter } = {}): Promise<RouteResult> {
   const changeType = requiredString(body, 'changeType')
   const sourceId = sourceFor(body, context)
   if (['create', 'overwrite', 'patch', 'append', 'delete_file', 'delete_directory', 'move', 'rename', 'mkdir', 'rmdir'].includes(changeType)) {
@@ -1044,9 +1057,21 @@ async function apply(body: Payload, context: PortableExecutionContext): Promise<
   const source = requireEnabledSource(sourceId)
   if (changeType === 'create_run') {
     const goal = requiredString(body, 'goal')
-    const executionMode = body.executionMode === 'codex' || body.executionMode === 'direct' || body.executionMode === 'auto'
+    const requestedExecutionMode = body.executionMode === 'codex' || body.executionMode === 'direct' || body.executionMode === 'auto'
       ? body.executionMode
       : body.nativeDirectGoal === true ? 'direct' : 'auto'
+    const adaptive = routeAdaptiveExecution({
+      goal,
+      sourceId,
+      requestedMode: requestedExecutionMode,
+      codexAvailable: options.codexAvailable
+    })
+    const executionMode = adaptive.selectedMode
+    const providerStatus = adaptive.selection.fallback.from === 'codex'
+      ? projectCodexProviderStatus({ directCapability: true, availability: 'unavailable', reason: 'Codex unavailable. Continue with Instant Mode?' })
+      : adaptive.codexAvailable
+        ? projectCodexProviderStatus({ directCapability: true, availability: 'available', reason: 'Codex capability probe passed.' })
+        : projectCodexProviderStatus({ directCapability: true })
     let validatedNativeGoalPaths: string[] = []
     let continuation: WorkbenchContinuationContext | undefined
     if (body.followUpContext !== undefined && body.followUpContext !== null) {
@@ -1093,7 +1118,8 @@ async function apply(body: Payload, context: PortableExecutionContext): Promise<
         documentationPath: typeof body.documentationPath === 'string' ? body.documentationPath : undefined,
         maxIterations: typeof body.maxIterations === 'number' ? body.maxIterations : undefined,
         dispatch: body.goalDispatch as WorkbenchGoalDispatchInput,
-        goalContext
+        goalContext,
+        ...(executionMode === 'codex' ? { codex: codexDispatch(options.codex, source.path, context.requestId) } : {})
       })
       return { statusCode: result.status === 'blocked' ? 409 : 202, body: { ...result, executionMode } }
     }
@@ -1112,7 +1138,7 @@ async function apply(body: Payload, context: PortableExecutionContext): Promise<
           body: {
             status: 'blocked',
             verified: false,
-            executionMode, providerStatus: projectCodexProviderStatus({ directCapability: true }), nativeGoal: { intent: compilation.intent, route: compilation.route, reviewMessage: compilation.reviewMessage, compilerMs: compilation.compilerMs },
+            executionMode, providerStatus, nativeGoal: { intent: compilation.intent, route: compilation.route, reviewMessage: compilation.reviewMessage, compilerMs: compilation.compilerMs },
             error: { code: 'NATIVE_GOAL_REVIEW_REQUIRED', message: compilation.reviewMessage }
           }
         }
@@ -1126,7 +1152,8 @@ async function apply(body: Payload, context: PortableExecutionContext): Promise<
           documentationPath: typeof body.documentationPath === 'string' ? body.documentationPath : undefined,
           maxIterations: typeof body.maxIterations === 'number' ? body.maxIterations : undefined,
           dispatch: compilation.dispatch,
-          goalContext
+          goalContext,
+          ...(executionMode === 'codex' ? { codex: codexDispatch(options.codex, source.path, context.requestId) } : {})
         })
         return {
           statusCode: result.status === 'blocked' ? 409 : 202,
@@ -1153,14 +1180,14 @@ async function apply(body: Payload, context: PortableExecutionContext): Promise<
           created: roadmap.created,
           verified: true,
           executionMode,
-          providerStatus: projectCodexProviderStatus({ directCapability: true }),
+          providerStatus,
           run: getActiveWorkbenchRun(sourceId) || roadmap.run,
           nativeGoal: { intent: compilation.intent, route: compilation.route, reviewMessage: compilation.reviewMessage, compilerMs: compilation.compilerMs }
         }
       }
     }
     const result = createWorkbenchRun({ sourceId, goal, goalContext, documentationPath: typeof body.documentationPath === 'string' ? body.documentationPath : undefined, maxIterations: typeof body.maxIterations === 'number' ? body.maxIterations : undefined, autoCommit: body.autoCommit === true, autoPush: false, autonomyLevel: 'hands_off_safe' })
-    return { statusCode: 200, body: { status: 'ok', created: result.created, verified: true, executionMode, providerStatus: projectCodexProviderStatus({ directCapability: true }), run: getActiveWorkbenchRun(sourceId) || result.run } }
+    return { statusCode: 200, body: { status: 'ok', created: result.created, verified: true, executionMode, providerStatus, run: getActiveWorkbenchRun(sourceId) || result.run } }
   }
   if (changeType === 'resume_run') {
     // Never infer an active run for a public/native lifecycle request. A
@@ -1251,10 +1278,16 @@ async function commit(body: Payload, context: PortableExecutionContext): Promise
 }
 
 /** The only mutation composition boundary used by the native portable host. */
-export function createPortableMutationHandlers(): PortableOperationHandlers {
+export type PortableMutationHandlerDependencies = {
+  session?: WorkbenchSessionStoreOptions
+  codexAvailable?: () => boolean
+  codex?: CodexDelegationAdapter
+}
+
+export function createPortableMutationHandlers(dependencies: PortableMutationHandlerDependencies = {}): PortableOperationHandlers {
   return {
     applyWorkbenchFileChange: async (payload, context) => {
-      const result = await apply(asPayload(payload), context)
+      const result = await apply(asPayload(payload), context, { codexAvailable: dependencies.codexAvailable, codex: dependencies.codex })
       if (result.statusCode >= 400) throwForRouteResult(result)
       return result.body
     },
@@ -1264,7 +1297,7 @@ export function createPortableMutationHandlers(): PortableOperationHandlers {
       return result.body
     },
     runWorkbenchCommand: async (payload, context) => {
-      const result = await executeWorkbenchCommandMutation(asPayload(payload), context)
+      const result = await executeWorkbenchCommandMutation(asPayload(payload), context, { session: dependencies.session })
       if (result.statusCode >= 400) throwForRouteResult(result)
       return result.body
     }

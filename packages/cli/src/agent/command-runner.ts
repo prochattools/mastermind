@@ -45,6 +45,8 @@ export type SafeCommandKind =
   | 'diagnose_performance'
   | 'local_cli_github_auth_status'
   | 'local_cli_github_repo_view'
+  | 'local_cli_github_pr_list'
+  | 'local_cli_github_pr_create'
   | 'run_exact_command'
   | 'run_repo_shell'
   | 'n8n_workflow_export'
@@ -121,6 +123,10 @@ export type SafeCommandRequest = {
   confirmationToken?: string
   /** Internal portable-host cancellation only; never accepted from a public payload. */
   signal?: AbortSignal
+  /** Internal Workbench delivery authority only; never accepted from a public command payload. */
+  governedPush?: true
+  /** Internal Workbench pull-request authority only; never accepted from a public command payload. */
+  governedPullRequest?: true
 }
 
 export type SafeCommandResult = {
@@ -1952,6 +1958,14 @@ export async function runSafeCommand(request: SafeCommandRequest): Promise<SafeC
   if (request.commandKind === 'diagnose_performance') return runRepoLocalTsxScript(request, 'scripts/diagnose-performance.ts')
   if (request.commandKind === 'local_cli_github_auth_status') return runProcess(request, ['gh', 'auth', 'status'], sourceRoot)
   if (request.commandKind === 'local_cli_github_repo_view') return runProcess(request, ['gh', 'repo', 'view', '--json', 'nameWithOwner,url,defaultBranchRef'], sourceRoot)
+  if (request.commandKind === 'local_cli_github_pr_list' || request.commandKind === 'local_cli_github_pr_create') {
+    if (request.governedPullRequest !== true) throw new Error('GitHub pull-request commands are Workbench-governed only.')
+    const args = Array.isArray(request.args) ? request.args : []
+    if (args.length === 0) throw new Error('GitHub pull-request command arguments are required.')
+    if (request.commandKind === 'local_cli_github_pr_list' && args[0] !== 'list') throw new Error('The governed GitHub list command is fixed.')
+    if (request.commandKind === 'local_cli_github_pr_create' && (args[0] !== 'create' || !args.includes('--draft'))) throw new Error('Only governed draft pull-request creation is supported.')
+    return runProcess(request, ['gh', 'pr', ...args], sourceRoot)
+  }
 
   if (request.commandKind === 'validate_json_files') return validateJsonFiles(request)
   if (request.commandKind === 'security_scan_paths') return scanSecurityPaths(request)
@@ -2053,6 +2067,9 @@ export async function runSafeCommand(request: SafeCommandRequest): Promise<SafeC
     const branch = typeof request.branch === 'string' && request.branch.trim() ? request.branch.trim() : currentBranch(sourceRoot)
     if (!SAFE_REMOTE.test(remote)) throw new Error('remote must be a safe remote name')
     if (!SAFE_BRANCH.test(branch) || branch.startsWith('-') || branch.includes('..')) throw new Error('branch must be a safe branch name')
+    if (request.governedPush === true) {
+      return runProcess(request, ['git', 'push', remote, `HEAD:refs/heads/${branch}`], sourceRoot)
+    }
     return runGithubCliBackedPush(request, remote, branch, sourceRoot)
   }
 

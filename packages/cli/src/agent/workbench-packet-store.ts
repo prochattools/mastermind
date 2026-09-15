@@ -195,6 +195,7 @@ export function updateWorkbenchPacketStatus(params: {
   packetId: string
   status: WorkbenchPacketStatus
   failureReason?: string
+  commitHash?: string
 }): WorkbenchPacketRecord | undefined {
   return withExclusiveStoreLock<WorkbenchPacketRecord | undefined>(() => {
     const store = readStore()
@@ -210,7 +211,8 @@ export function updateWorkbenchPacketStatus(params: {
       completedAt: params.status === 'completed' ? now : current.completedAt,
       failedAt: params.status === 'failed' ? now : current.failedAt,
       cancelledAt: params.status === 'cancelled' ? now : current.cancelledAt,
-      failureReason: params.status === 'failed' ? params.failureReason : current.failureReason
+      failureReason: params.status === 'failed' ? params.failureReason : current.failureReason,
+      commitHash: params.status === 'completed' ? params.commitHash || current.commitHash : current.commitHash
     }
     store.packets[index] = updated
     persistStore(store)

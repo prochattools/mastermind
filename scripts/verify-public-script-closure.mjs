@@ -36,7 +36,7 @@ async function exists(candidate) {
 async function walkPackageManifests(root, directory = root) {
   const manifests = []
   for (const entry of await fs.readdir(directory, { withFileTypes: true })) {
-    if (entry.name === 'node_modules' || entry.name === '.git' || entry.name === '.buildflow') continue
+    if (entry.name === 'node_modules' || entry.name === '.git' || entry.name === '.buildflow' || entry.name === 'dist' || entry.name === '.next' || entry.name === 'build' || entry.name === 'out' || entry.name === 'coverage') continue
     const candidate = path.join(directory, entry.name)
     if (entry.isDirectory()) manifests.push(...await walkPackageManifests(root, candidate))
     else if (entry.isFile() && entry.name === 'package.json') manifests.push(candidate)

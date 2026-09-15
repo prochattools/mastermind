@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto'
 import { executeAction, ActionTransportError, executeActionGET, fetchWithTimeout, type ActionTransportOptions } from './transport'
 import { getBackendUrl, getBackendMode } from './config'
 import { buildActionErrorEnvelope } from './action-response'
+import { getSafeActionHttpStatus } from './http-status'
 import { GPT_ACTION_RESPONSE_BYTE_LIMIT, GPT_ACTION_RESPONSE_CHAR_LIMIT } from './payload-budget'
 import {
   GPT_ACTION_DEFAULT_FILE_BYTES,
@@ -654,21 +655,51 @@ async function fetchJson(endpoint: string, init?: RequestInit, transportOptions?
 // Normalize action errors into consistent error envelope format with proper HTTP status code extraction.
 export function unwrapActionError(err: unknown, fallback: string) {
   if (err instanceof ActionTransportError) {
+    const payload = err.payload
+    if (payload && typeof payload === 'object' && !Array.isArray(payload)) {
+      const envelope = payload as Record<string, unknown>
+      const nestedError = envelope.error
+      if (envelope.ok === false && nestedError && typeof nestedError === 'object' && !Array.isArray(nestedError)) {
+        const code = (nestedError as Record<string, unknown>).code
+        if (typeof code === 'string' && code.length > 0) {
+          return {
+            error: payload,
+            status: getSafeActionHttpStatus(payload)
+          }
+        }
+      }
+    }
+
+    if (err.statusCode === 401 || err.statusCode === 403) {
+      return {
+        error: buildActionErrorEnvelope({
+          code: 'WORKBENCH_AUTH_ERROR',
+          message: 'Workbench authentication failed.',
+          recovery: ['Refresh the Workbench credential.', 'Retry the request after authentication succeeds.'],
+          status: 'error',
+          connected: true
+        }),
+        status: err.statusCode
+      }
+    }
+
     return {
-      error: err.payload || buildActionErrorEnvelope({
-        code: 'ACTION_TRANSPORT_ERROR',
-        message: err.message,
-        details: `Elapsed ${Date.now()}ms`,
+      error: buildActionErrorEnvelope({
+        code: err.statusCode >= 500 ? 'WORKBENCH_STATUS_ERROR' : 'ACTION_TRANSPORT_ERROR',
+        message: err.statusCode >= 500
+          ? 'Workbench status could not be completed.'
+          : 'Workbench transport failed before a structured response was available.',
+        details: fallback,
         status: 'error'
       }),
-      status: err.statusCode
+      status: err.statusCode >= 500 ? 500 : getSafeActionHttpStatus({ error: { code: 'ACTION_TRANSPORT_ERROR' } })
     }
   }
   return {
     error: buildActionErrorEnvelope({
       code: 'WORKBENCH_STATUS_ERROR',
       message: fallback,
-      details: err instanceof Error ? err.message : String(err)
+      details: 'Workbench status failed before a safe response could be produced.'
     }),
     status: 500
   }

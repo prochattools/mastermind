@@ -163,7 +163,7 @@ function assertChangedPathsWithinAuthorization(
   return changedPaths
 }
 
-function verifyExactPathSet(actual: string[], expected: string[], label: string): void {
+export function verifyExactPathSet(actual: string[], expected: string[], label: string): void {
   const actualSorted = sortedUnique(actual)
   const expectedSorted = sortedUnique(expected)
   if (JSON.stringify(actualSorted) !== JSON.stringify(expectedSorted)) {

@@ -66,6 +66,67 @@ export type DelegationEvidenceSummary = {
   reasonCode?: string
 }
 
+export type DelegationDeliveryEvidence = {
+  status: 'pushed' | 'already_reconciled' | 'blocked' | 'failed' | 'ambiguous'
+  remote: string
+  branch: string
+  commitHash: string
+  previousRemoteHead?: string
+  resultingRemoteHead?: string
+  durationMs: number
+  reasonCode?: string
+}
+
+export type DelegationPullRequestEvidence = {
+  status: 'created' | 'already_reconciled' | 'blocked' | 'failed' | 'ambiguous'
+  pullRequestCreated: boolean
+  provider: 'github'
+  repository: string
+  number?: number
+  url?: string
+  draft: true
+  baseBranch: string
+  headBranch: string
+  headCommit: string
+  title: string
+  previousMatchingPr: 'absent' | 'present'
+  reconciliation: 'not_required' | 'pending' | 'matched' | 'mismatched' | 'ambiguous' | 'draft_changed' | 'closed' | 'merged' | 'head_drift' | 'base_mismatch' | 'metadata_drift' | 'not_found' | 'provider_unavailable' | 'authentication_unavailable'
+  createdAt?: string
+  durationMs: number
+  reasonCode?: string
+  lastObserved?: DelegationPullRequestObservation
+}
+
+export type DelegationPullRequestObservation = {
+  state: 'OPEN' | 'CLOSED' | 'MERGED'
+  draft: boolean
+  headBranch: string
+  headCommit: string
+  baseBranch: string
+  title: string
+  observedAt: string
+  readiness?: {
+    status: 'ready' | 'not_ready' | 'unknown'
+    reasons: string[]
+    mergeable: string | null
+    mergeStateStatus: string | null
+    checks: {
+      state: 'passing' | 'failing' | 'pending' | 'unknown'
+      total: number
+      passing: number
+      failing: number
+      pending: number
+      unknown: number
+    }
+    reviewDecision: string | null
+    approvals: number
+    changesRequested: number
+    reviewRequests: number
+    requiredReviews: 'satisfied' | 'required' | 'blocked' | 'unknown'
+    branchProtection: 'available' | 'unavailable' | 'unknown'
+  }
+}
+
 export type ExternalDelegationOperation = {
   schemaVersion: typeof EXTERNAL_DELEGATION_SCHEMA_VERSION
   operationId: string
@@ -86,6 +147,8 @@ export type ExternalDelegationOperation = {
   updatedAt: string
   reasonCode: DelegationReasonCode
   evidence?: DelegationEvidenceSummary
+  delivery?: DelegationDeliveryEvidence
+  pullRequest?: DelegationPullRequestEvidence
   cancellation: DelegationCancellation
   reconciliation: DelegationReconciliation
 }
@@ -256,7 +319,7 @@ export function reconcileDelegationOperation(operation: ExternalDelegationOperat
   return { ...operation, lifecycle, evidence, reconciliation: lifecycle === 'ambiguous' ? 'ambiguous' : 'matched', reasonCode: lifecycle === 'ambiguous' ? 'reconciliation_ambiguous' : 'reconciliation_matched' }
 }
 
-export function projectDelegationStatus(operation: ExternalDelegationOperation): { executor: string; operationId: string; lifecycle: DelegationLifecycle; authorization: DelegationAuthorization; confirmation: DelegationConfirmation; cancellation: DelegationCancellation; reconciliation: DelegationReconciliation; blocker?: string; nextAction: string; evidence?: DelegationEvidenceSummary } {
+export function projectDelegationStatus(operation: ExternalDelegationOperation): { executor: string; operationId: string; lifecycle: DelegationLifecycle; authorization: DelegationAuthorization; confirmation: DelegationConfirmation; cancellation: DelegationCancellation; reconciliation: DelegationReconciliation; blocker?: string; nextAction: string; evidence?: DelegationEvidenceSummary; delivery?: DelegationDeliveryEvidence; pullRequest?: DelegationPullRequestEvidence } {
   const blocker = operation.lifecycle === 'awaiting_confirmation' ? 'Authorization or confirmation is required.' : operation.lifecycle === 'ambiguous' || operation.lifecycle === 'reconciliation_required' ? 'External state requires reconciliation.' : undefined
   const nextAction = blocker ? 'Use manual fallback or reconcile exact evidence.' : TERMINAL_OPERATIONS.has(operation.lifecycle) ? 'Review bounded evidence and keep the packet closed.' : 'Manual copy/paste remains the supported execution path.'
   return {
@@ -269,7 +332,9 @@ export function projectDelegationStatus(operation: ExternalDelegationOperation):
     reconciliation: operation.reconciliation,
     ...(blocker ? { blocker } : {}),
     nextAction,
-    ...(operation.evidence ? { evidence: operation.evidence } : {})
+    ...(operation.evidence ? { evidence: operation.evidence } : {}),
+    ...(operation.delivery ? { delivery: operation.delivery } : {}),
+    ...(operation.pullRequest ? { pullRequest: operation.pullRequest } : {})
   }
 }
 

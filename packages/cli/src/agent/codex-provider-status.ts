@@ -10,6 +10,8 @@ export type CodexProviderStatus = {
 
 export type CodexProviderStatusInput = {
   fixture?: CodexProviderAvailability
+  availability?: CodexProviderAvailability
+  reason?: string
   executablePresent?: boolean
   authenticated?: boolean
   directCapability?: boolean
@@ -31,6 +33,15 @@ export function projectCodexProviderStatus(input: CodexProviderStatusInput = {})
       checked: true,
       fallback: input.fixture === 'available' ? 'none' : fallback,
       reason: input.fixture === 'rate_limited' ? 'deterministic fixture: provider rate limit' : `deterministic fixture: ${input.fixture}`
+    }
+  }
+  if (input.availability) {
+    return {
+      provider: 'codex',
+      availability: input.availability,
+      checked: true,
+      fallback: input.availability === 'available' ? 'none' : fallback,
+      reason: input.reason || `provider availability: ${input.availability}`
     }
   }
   if (input.executablePresent === false) return { provider: 'codex', availability: 'unavailable', checked: true, fallback, reason: 'provider executable is unavailable' }

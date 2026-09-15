@@ -70,6 +70,8 @@ export type WorkbenchGoalDispatch = {
   reads?: WorkbenchGoalRead[]
   commands?: WorkbenchGoalCommand[]
   readOnly?: boolean
+  commit?: WorkbenchPacketCommitPolicy & { authorized?: boolean }
+  pushIntent?: 'not_requested' | 'explicitly_authorized'
 }
 
 export type WorkbenchPacket = {
@@ -79,6 +81,7 @@ export type WorkbenchPacket = {
   idempotencyKey: string
   sourceId: string
   taskId: string
+  sourceBranch?: string
   planId?: string
   planDigest?: string
   goalSummary: string

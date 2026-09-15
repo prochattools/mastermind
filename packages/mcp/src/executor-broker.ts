@@ -78,11 +78,26 @@ export type WorkbenchExecutorResult = {
   durationMs: number
 }
 
+export type WorkbenchMutationReconciliationEvidence = {
+  state: 'passed' | 'failed' | 'unavailable' | 'executor_failed'
+  worktreeId: string
+  expectedPaths: string[]
+  changedPaths: string[]
+  conflicts: string[]
+  diffDigest?: string
+  expectedHead: string
+  observedHead?: string
+  baseHeadUnchanged: boolean
+  commitDetected: boolean
+  validation: { commandKind: 'git_diff_check'; status: 'passed' | 'failed' | 'unavailable'; exitCode: number | null; durationMs: number }
+}
+
 export type WorkbenchExecutorEvidence = {
   filesChanged: string[]
   validationPassed: boolean
   commitHash?: string
   outputSummary: string
+  mutation?: WorkbenchMutationReconciliationEvidence
   telemetry?: WorkbenchExecutorTelemetry
 }
 

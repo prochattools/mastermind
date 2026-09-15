@@ -25,6 +25,7 @@ import { projectActiveRunContinuity, resolveResumeNavigation, type ActiveRunCont
 import { getFocusedWorkspace } from './focused-workspace'
 import { getSourceReconciliationReport } from './source-reconciliation'
 import type { IndexedDoc } from '@workbench/shared'
+import type { WorkbenchSessionStoreOptions } from './workbench-session-store'
 
 const MAX_PATHS = 5
 const MAX_FILE_BYTES = 4_000
@@ -33,6 +34,7 @@ const LARGE_FILE_BYTES = 100 * 1024
 type Payload = Record<string, unknown>
 
 export type PortableReadHandlerDependencies = {
+  session?: WorkbenchSessionStoreOptions
   indexedFiles?: () => number
   indexingActive?: () => boolean
   indexingSourceIds?: () => string[]
@@ -159,6 +161,7 @@ function actionRunGoal(payload: Payload): string {
 export function compactStatusRun(value: unknown): Record<string, unknown> | undefined {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined
   const run = value as Record<string, unknown>
+  const continuity = projectActiveRunContinuity(run)
   return {
     ...(typeof run.id === 'string' ? { id: run.id } : {}),
     ...(typeof run.runId === 'string' ? { runId: run.runId } : {}),
@@ -179,6 +182,7 @@ export function compactStatusRun(value: unknown): Record<string, unknown> | unde
     ...(typeof run.blockedReason === 'string' ? { blockedReason: run.blockedReason.slice(0, 240) } : {}),
     ...(typeof run.recommendedReasoning === 'string' ? { recommendedReasoning: run.recommendedReasoning } : {}),
     ...(typeof run.recommendedExecutor === 'string' ? { recommendedExecutor: run.recommendedExecutor } : {}),
+    ...(continuity?.oversightFrame ? { oversightFrame: continuity.oversightFrame } : {}),
     ...(typeof run.updatedAt === 'string' ? { updatedAt: run.updatedAt } : {})
   }
 }
@@ -446,6 +450,9 @@ async function makeSearcherWithFilesystemFallback(sourceIds: string[], dependenc
 async function readContext(payload: Payload, executionContext?: PortableExecutionContext, dependencies: PortableReadHandlerDependencies = {}): Promise<Record<string, unknown>> {
   const mode = asString(payload.mode)
   if (!mode) fail('invalid_request', 'mode is required')
+  const exactPaths = mode === 'prepare_task_context' && Array.isArray(payload.paths)
+    ? payload.paths.filter((value): value is string => typeof value === 'string' && value.trim().length > 0).slice(0, MAX_PATHS)
+    : []
   if (mode === 'read_paths') return readPaths(payload, executionContext)
   if (mode === 'list_files') return listFiles(payload, executionContext)
   if (mode === 'search_and_read' && !asString(payload.path)) {
@@ -544,7 +551,9 @@ async function readContext(payload: Payload, executionContext?: PortableExecutio
       ? authorizeContextRead(selected[0], typeof payload.contextIntelligenceSessionId === 'string' ? payload.contextIntelligenceSessionId : undefined, executionContext?.sourceId ? 'execution-context' : asString(payload.sourceId) ? 'explicit-source-id' : 'active-source-context')
       : undefined
     if (preparation && !preparation.ok) fail('dependency_unavailable', 'message' in preparation ? preparation.message : 'Context preparation failed.')
-    const searcherResult = await makeSearcherWithFilesystemFallback(selected, dependencies)
+    const searcherResult = exactPaths.length > 0
+      ? { searcher: new VaultSearcher([]), fallbackUsed: false }
+      : await makeSearcherWithFilesystemFallback(selected, dependencies)
     const searcher = searcherResult.searcher
     if (mode === 'prepare_task_context') {
       const workflowStartedAt = Date.now()
@@ -570,13 +579,14 @@ async function readContext(payload: Payload, executionContext?: PortableExecutio
           }
       let prepared
       try {
-        const paths = Array.isArray(payload.paths) ? payload.paths.filter((value): value is string => typeof value === 'string').slice(0, MAX_PATHS) : undefined
+        const paths = exactPaths.length > 0 ? exactPaths : undefined
         prepared = await prepareTaskContext({
           query,
           sourceIds: selected,
           searcher,
           limit: bounded(payload.limit, 5, 1, 5),
           paths,
+          skipSearch: exactPaths.length > 0,
           maxBytesPerFile: bounded(payload.maxBytesPerFile, 3_000, 1_000, MAX_FILE_BYTES),
           knowledgeContext,
           structuralContext: shouldPrepareStructuralContext(query, paths) ? structuralContext : undefined
@@ -667,7 +677,7 @@ async function contextReadWithDependencies(payload: Payload, context: PortableEx
 
   const sourceId = actionRunSourceId(payload, context)
   const binding = sourceId
-    ? ensureWorkbenchActionRun({ sourceId, goal: actionRunGoal(payload), requestId: context.requestId })
+    ? ensureWorkbenchActionRun({ sourceId, goal: actionRunGoal(payload), requestId: context.requestId, session: dependencies.session })
     : undefined
   if (binding) projectActionRunStart(binding, context)
 

@@ -8,7 +8,7 @@ import crypto from 'crypto'
  * descends beyond the hard ceiling.
  */
 export const INDEX_SCAN_POLICY_VERSION = 'source-index-v2'
-export const INDEX_SCAN_EXCLUSION_VERSION = 'source-exclusions-v2'
+export const INDEX_SCAN_EXCLUSION_VERSION = 'source-exclusions-v3'
 
 // The deepest legitimate current Workbench path is depth 9. One segment of
 // headroom covers the next normal route/module nesting without making the
@@ -24,6 +24,28 @@ export const MAX_INDEX_SCAN_RESULTS = 2_000
 export const MAX_INDEX_SCAN_BYTES = 64 * 1024 * 1024
 export const MAX_INDEX_SCAN_WALL_TIME_MS = 15_000
 export const MAX_INDEXABLE_FILE_BYTES = 1024 * 1024
+
+/**
+ * File types whose contents are deterministically not textual Workbench
+ * context. They remain subject to traversal and file-count limits, but do not
+ * consume the separate textual-byte budget or enter the emitted index set.
+ */
+export const NON_TEXTUAL_INDEX_EXTENSIONS = Object.freeze([
+  '.7z', '.a', '.aac', '.avi', '.bin', '.bmp', '.class', '.db', '.dmg', '.dll',
+  '.doc', '.docx', '.eot', '.exe', '.flac', '.gif', '.gz', '.heic', '.heif',
+  '.ico', '.jar', '.jpeg', '.jpg', '.mov', '.mp3', '.mp4', '.o', '.ogg', '.otf',
+  '.pdf', '.png', '.pyc', '.so', '.sqlite', '.svg', '.tar', '.tif', '.tiff',
+  '.ttf', '.wav', '.webm', '.webp', '.woff', '.woff2', '.xls', '.xlsx', '.zip'
+] as const)
+
+const NON_TEXTUAL_INDEX_EXTENSION_SET = new Set<string>(NON_TEXTUAL_INDEX_EXTENSIONS)
+
+export function isDeterministicallyNonTextualPath(filePath: string): boolean {
+  const normalized = filePath.replace(/\\/g, '/')
+  const basename = normalized.slice(normalized.lastIndexOf('/') + 1).toLowerCase()
+  const extension = basename.includes('.') ? basename.slice(basename.lastIndexOf('.')) : ''
+  return NON_TEXTUAL_INDEX_EXTENSION_SET.has(extension)
+}
 
 /**
  * These names are repository content that is either runtime state or build /
@@ -86,6 +108,7 @@ export type IndexScanPolicy = {
   maxWallTimeMs: number
   maxEntriesPerDirectory: number
   maxIndexableFileBytes: number
+  nonTextualIndexExtensions: readonly string[]
   ignorePatterns: readonly string[]
   symlinkPolicy: 'reject'
 }
@@ -102,6 +125,7 @@ const policyDescriptor = JSON.stringify({
   maxWallTimeMs: MAX_INDEX_SCAN_WALL_TIME_MS,
   maxEntriesPerDirectory: MAX_INDEX_SCAN_ENTRIES_PER_DIRECTORY,
   maxIndexableFileBytes: MAX_INDEXABLE_FILE_BYTES,
+  nonTextualIndexExtensions: NON_TEXTUAL_INDEX_EXTENSIONS,
   ignorePatterns: DEFAULT_IGNORE_PATTERNS,
   symlinkPolicy: 'reject'
 })
@@ -121,6 +145,7 @@ export const INDEX_SCAN_POLICY: IndexScanPolicy = Object.freeze({
   maxWallTimeMs: MAX_INDEX_SCAN_WALL_TIME_MS,
   maxEntriesPerDirectory: MAX_INDEX_SCAN_ENTRIES_PER_DIRECTORY,
   maxIndexableFileBytes: MAX_INDEXABLE_FILE_BYTES,
+  nonTextualIndexExtensions: NON_TEXTUAL_INDEX_EXTENSIONS,
   ignorePatterns: DEFAULT_IGNORE_PATTERNS,
   symlinkPolicy: 'reject'
 })

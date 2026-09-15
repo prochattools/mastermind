@@ -1,11 +1,23 @@
 import fs from 'fs'
 import path from 'path'
+import { execFileSync } from 'node:child_process'
 import { getConfigDir } from '../utils/paths'
 import type { WorkbenchPacketExecutionResult } from './workbench-packet-executor'
 import { WorkbenchEvidenceMetadataSchema, type WorkbenchEvidenceMetadata } from '@workbench/shared'
 import type { WorkbenchEvidenceUnavailable } from './workbench-evidence-producers'
+import type { WorkbenchExecutorResult } from '../../../mcp/dist/executor-broker.js'
 
 export const WORKBENCH_PACKET_RESULT_STORE_VERSION = 1 as const
+
+export type WorkbenchRepositoryState = {
+  branchName?: string
+  detached: boolean
+  dirty: boolean
+  upstreamKnown: boolean
+  ahead?: number
+  behind?: number
+  divergence: 'up_to_date' | 'ahead' | 'behind' | 'diverged' | 'unknown'
+}
 
 export type WorkbenchPacketCompactResult = {
   version: typeof WORKBENCH_PACKET_RESULT_STORE_VERSION
@@ -30,6 +42,8 @@ export type WorkbenchPacketCompactResult = {
   readEvidence: Array<{ mode: string; path: string; matches?: number; lines?: number }>
   commandEvidence: Array<{ commandKind: string; status: string; exitCode: number | null; durationMs: number }>
   commitHash?: string
+  repositoryState?: WorkbenchRepositoryState
+  executorResult?: WorkbenchExecutorResult
   errors: Array<{ code: string; message: string; path?: string }>
   recordedAt: string
 }
@@ -58,6 +72,55 @@ function compactMessage(value: string): string {
   return cleaned.length > MAX_ERROR_MESSAGE_LENGTH
     ? `${cleaned.slice(0, MAX_ERROR_MESSAGE_LENGTH - 3)}...`
     : cleaned
+}
+
+function repositoryState(sourceRoot?: string): WorkbenchRepositoryState | undefined {
+  if (!sourceRoot) return undefined
+  try {
+    const output = execFileSync('git', ['status', '--porcelain=v1', '--branch'], {
+      cwd: sourceRoot,
+      encoding: 'utf8',
+      timeout: 3_000,
+      stdio: ['ignore', 'pipe', 'pipe']
+    })
+    const lines = output.split(/\r?\n/).filter(Boolean)
+    const header = lines.shift() || ''
+    const branchMatch = header.match(/^## (.+?)(?:\.\.\.([^\s]+))?(?: \[([^\]]+)\])?$/)
+    const branchValue = branchMatch?.[1]?.trim()
+    const detached = !branchValue || branchValue === 'HEAD' || branchValue.startsWith('HEAD ')
+    const branchName = detached ? undefined : branchValue
+    const upstreamKnown = Boolean(branchMatch?.[2])
+    const tracking = branchMatch?.[3] || ''
+    const ahead = tracking.match(/(?:^|, )ahead (\d+)/)?.[1]
+    const behind = tracking.match(/(?:^|, )behind (\d+)/)?.[1]
+    const aheadCount = ahead === undefined ? 0 : Number(ahead)
+    const behindCount = behind === undefined ? 0 : Number(behind)
+    const divergence = !upstreamKnown
+      ? 'unknown'
+      : aheadCount > 0 && behindCount > 0
+        ? 'diverged'
+        : aheadCount > 0
+          ? 'ahead'
+          : behindCount > 0
+            ? 'behind'
+            : 'up_to_date'
+    return {
+      ...(branchName ? { branchName } : {}),
+      detached,
+      dirty: lines.length > 0,
+      upstreamKnown,
+      ...(ahead !== undefined ? { ahead: aheadCount } : {}),
+      ...(behind !== undefined ? { behind: behindCount } : {}),
+      divergence
+    }
+  } catch {
+    return {
+      detached: true,
+      dirty: true,
+      upstreamKnown: false,
+      divergence: 'unknown'
+    }
+  }
 }
 
 function readStore(): WorkbenchPacketResultStore {
@@ -107,7 +170,9 @@ export function recordWorkbenchPacketResult(params: {
   runId: string
   sourceId: string
   status: WorkbenchPacketCompactResult['status']
+  sourceRoot?: string
   execution?: WorkbenchPacketExecutionResult
+  executorResult?: WorkbenchExecutorResult
   error?: string
 }): WorkbenchPacketCompactResult {
   const execution = params.execution
@@ -134,6 +199,8 @@ export function recordWorkbenchPacketResult(params: {
     readEvidence: (execution?.readEvidence || []).slice(0, 5).map(item => ({ ...item })),
     commandEvidence: (execution?.commandEvidence || []).slice(0, 3).map(item => ({ ...item })),
     commitHash: execution?.commitHash,
+    repositoryState: repositoryState(params.sourceRoot),
+    ...(params.executorResult ? { executorResult: params.executorResult } : {}),
     errors: [
       ...(execution?.errors || []),
       ...(params.error ? [{ code: 'PACKET_WORKER_ERROR', message: params.error }] : [])

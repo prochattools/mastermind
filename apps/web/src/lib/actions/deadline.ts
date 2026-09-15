@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { buildActionErrorEnvelope, type ActionDiagnostics } from './action-response'
+import { getSafeActionHttpStatus } from './http-status'
 
 export const GPT_ACTION_DEADLINES_MS = {
   status: 4_000,
@@ -169,8 +170,7 @@ export async function withGptActionDeadline(
     return response
   } catch (err) {
     context.markStage('unhandled_error', {
-      errorName: err instanceof Error ? err.name : undefined,
-      errorMessage: err instanceof Error ? err.message : String(err)
+      errorName: err instanceof Error ? err.name : undefined
     })
     logActionEvent('error', context.diagnostics({ phase: 'unhandled_error' }))
     const transportPayload = err && typeof err === 'object' && 'payload' in err
@@ -180,32 +180,39 @@ export async function withGptActionDeadline(
       ? (err as { statusCode: number }).statusCode
       : 500
 
-    if (transportPayload && typeof transportPayload === 'object' && 'error' in transportPayload) {
-      const errorCode = (transportPayload as { error?: { code?: unknown } }).error?.code
-      if (typeof errorCode === 'string' && errorCode) {
-        const gatewayStatuses = [502, 503, 504, 507]
-        if (gatewayStatuses.includes(statusCode)) {
-          statusCode = 200
-        }
-      }
+    const transportRecord = transportPayload && typeof transportPayload === 'object' && !Array.isArray(transportPayload)
+      ? transportPayload as Record<string, unknown>
+      : undefined
+    const nestedError = transportRecord?.error
+    const structuredTransportPayload = transportRecord?.ok === false
+      && nestedError && typeof nestedError === 'object' && !Array.isArray(nestedError)
+      && typeof (nestedError as Record<string, unknown>).code === 'string'
+
+    if (structuredTransportPayload && [502, 503, 504, 507].includes(statusCode)) {
+      statusCode = getSafeActionHttpStatus(transportRecord)
     }
 
-    const payload = transportPayload && typeof transportPayload === 'object' && !Array.isArray(transportPayload)
+    const payload = structuredTransportPayload
       ? {
-          ...(transportPayload as Record<string, unknown>),
+          ...transportRecord,
           requestId,
           diagnostics: compactDiagnostics({
-            ...(((transportPayload as Record<string, unknown>).diagnostics && typeof (transportPayload as Record<string, unknown>).diagnostics === 'object')
-              ? (transportPayload as Record<string, unknown>).diagnostics as Record<string, unknown>
+            ...((transportRecord.diagnostics && typeof transportRecord.diagnostics === 'object' && !Array.isArray(transportRecord.diagnostics))
+              ? transportRecord.diagnostics as Record<string, unknown>
               : {}),
             ...context.diagnostics({ phase: 'unhandled_error' })
           })
         }
       : buildActionErrorEnvelope({
-          code: 'WORKBENCH_ACTION_ERROR',
-          message: 'Workbench action failed before response completion.',
-          details: err instanceof Error ? err.message : String(err),
+          code: statusCode === 401 || statusCode === 403
+            ? 'WORKBENCH_AUTH_ERROR'
+            : statusCode >= 500 ? 'WORKBENCH_STATUS_ERROR' : 'WORKBENCH_ACTION_ERROR',
+          message: statusCode === 401 || statusCode === 403
+            ? 'Workbench authentication failed.'
+            : statusCode >= 500 ? 'Workbench action failed before response completion.' : 'Workbench action returned an unstructured error.',
+          details: statusCode >= 500 ? 'The Workbench backend did not return a safe structured response.' : undefined,
           status: controller.signal.aborted ? 'timeout' : 'error',
+          connected: statusCode !== 401 && statusCode !== 403,
           requestId,
           diagnostics: context.diagnostics({ phase: 'unhandled_error' })
         })

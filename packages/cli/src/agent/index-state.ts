@@ -109,6 +109,11 @@ export function upsertIndexState(sourceId: string, record: Partial<SourceIndexRe
     ...record,
     indexStatus: record.indexStatus || current.indexStatus || 'unknown'
   }
+  // Optional fields are also the explicit clear signal used when a source
+  // moves from a failed/indexing state back to a healthy terminal state.
+  for (const [key, value] of Object.entries(record)) {
+    if (value === undefined) delete (next as Record<string, unknown>)[key]
+  }
   state[sourceId] = next
   saveIndexState(state)
   return state

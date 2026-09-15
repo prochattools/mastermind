@@ -382,6 +382,7 @@ export async function prepareTaskContext(params: {
   const seedPaths = Array.isArray(params.paths)
     ? params.paths.filter(path => typeof path === 'string' && path.trim().length > 0).slice(0, 5).flatMap(path => sourceIds.map(sourceId => ({ sourceId, path })))
     : []
+  const skipSearch = params.skipSearch === true || seedPaths.length > 0
 
   let navigationEvidence: TaskContextNavigation | undefined
   let navigationSeedPaths: Array<{ sourceId: string; path: string }> = []
@@ -406,7 +407,7 @@ export async function prepareTaskContext(params: {
 
   const searchStartedAt = Date.now()
   const emptySearchResult: Pick<BoundedSearchResult, 'results' | 'sourceWarnings' | 'partial'> = { results: [], sourceWarnings: [], partial: false }
-  const pathSearch = params.skipSearch
+  const pathSearch = skipSearch
     ? emptySearchResult
     : params.searcher.searchBounded(query, limit, sourceIds, {
       startedAt: searchStartedAt,
@@ -414,7 +415,7 @@ export async function prepareTaskContext(params: {
       maxDocsPerSource: 1200,
       maxContentDocsPerSource: 250
     })
-  const contentSearch = params.skipSearch
+  const contentSearch = skipSearch
     ? emptySearchResult
     : params.searcher.searchBounded(`content:${query}`, limit, sourceIds, {
       startedAt: searchStartedAt,
@@ -422,8 +423,9 @@ export async function prepareTaskContext(params: {
       maxDocsPerSource: 1200,
       maxContentDocsPerSource: 250
     })
-  const searchNotes = [...pathSearch.sourceWarnings, ...contentSearch.sourceWarnings]
-    .map(warning => warning.message)
+  const searchNotes = skipSearch && seedPaths.length > 0
+    ? ['Exact paths were supplied; semantic search was skipped.']
+    : [...pathSearch.sourceWarnings, ...contentSearch.sourceWarnings].map(warning => warning.message)
   const searchMs = Date.now() - searchStartedAt
   const candidates = dedupeResults([...pathSearch.results, ...contentSearch.results], [...seedPaths, ...navigationSeedPaths]).slice(0, limit)
 

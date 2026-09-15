@@ -150,10 +150,12 @@ export type AgentJob = {
 }
 
 export type CompactProgress = {
-  percent: number
+  percent?: number
+  numerator?: number
+  denominator?: number
   bar: string
   accessibleLabel: string
-  confidence: 'exact' | 'low'
+  confidence: 'exact' | 'unknown'
 }
 
 export type CompactStatusProjection = {
@@ -560,18 +562,18 @@ function persistJobs(): void {
   loadedJobsFileSignature = jobsFileSignature()
 }
 
-function requireWorkbenchRunSession(job: AgentJob): void {
-  const synchronized = synchronizeWorkbenchRunSession(job)
+function requireWorkbenchRunSession(job: AgentJob, session?: WorkbenchSessionStoreOptions): void {
+  const synchronized = synchronizeWorkbenchRunSession(job, session)
   if (synchronized.ok === true) return
 
   throw new Error(`Workbench run session synchronization failed: ${synchronized.code}: ${synchronized.message}`)
 }
 
-function persistJobTransition(previous: AgentJob | undefined, next: AgentJob): void {
+function persistJobTransition(previous: AgentJob | undefined, next: AgentJob, session?: WorkbenchSessionStoreOptions): void {
   jobs.set(next.id, next)
   try {
     persistJobs()
-    requireWorkbenchRunSession(next)
+    requireWorkbenchRunSession(next, session)
     return
   } catch (error) {
     if (previous) jobs.set(previous.id, previous)
@@ -635,7 +637,7 @@ function buildFallbackPrompt(job: Pick<AgentJob, 'sourceId' | 'goal' | 'goalCont
 
 loadJobsFromDisk()
 
-export function startAgentJob(params: { sourceId: string; goal: string; goalContext?: WorkbenchGoalContext; requestId?: string; maxIterations?: number; autonomyLevel?: AgentAutonomyLevel; documentationPath?: string; reviewEveryStep?: boolean; autoCommit?: boolean; autoPush?: boolean; executionBudget?: RunExecutionBudgetLimits }): AgentJob {
+export function startAgentJob(params: { sourceId: string; goal: string; goalContext?: WorkbenchGoalContext; requestId?: string; maxIterations?: number; autonomyLevel?: AgentAutonomyLevel; documentationPath?: string; reviewEveryStep?: boolean; autoCommit?: boolean; autoPush?: boolean; executionBudget?: RunExecutionBudgetLimits; session?: WorkbenchSessionStoreOptions }): AgentJob {
   const sourceId = String(params.sourceId || '').trim()
   if (!sourceId) throw new Error('sourceId is required')
   const goal = sanitizeGoal(params.goal)
@@ -694,7 +696,7 @@ export function startAgentJob(params: { sourceId: string; goal: string; goalCont
     resumeInstructions
   }
   job.resumeProjection = buildResumeProjection({ run: job })
-  persistJobTransition(undefined, job)
+  persistJobTransition(undefined, job, params.session)
   return job
 }
 
@@ -1065,21 +1067,32 @@ export function tenCellProgressBar(percent: number): string {
   return `${'●'.repeat(filled)}${'○'.repeat(10 - filled)}`
 }
 
-function progressValue(label: string, percent: number, confidence: CompactProgress['confidence']): CompactProgress {
-  const bounded = Math.min(100, Math.max(0, Math.round(percent)))
+function progressValue(label: string, completed: number, total: number): CompactProgress {
+  const numerator = Math.max(0, Math.floor(completed))
+  const denominator = Math.max(0, Math.floor(total))
+  if (denominator === 0) {
+    return {
+      numerator: 0,
+      denominator: 0,
+      bar: '—',
+      accessibleLabel: `${label} progress unknown`,
+      confidence: 'unknown'
+    }
+  }
+  const bounded = Math.min(100, Math.max(0, Math.round((Math.min(numerator, denominator) / denominator) * 100)))
   return {
     percent: bounded,
+    numerator: Math.min(numerator, denominator),
+    denominator,
     bar: tenCellProgressBar(bounded),
-    accessibleLabel: `${label} progress ${bounded} percent${confidence === 'low' ? ', low-confidence estimate' : ''}`,
-    confidence
+    accessibleLabel: `${label} progress ${bounded} percent`,
+    confidence: 'exact'
   }
 }
 
 function taskProgress(status: AgentTaskStatus | undefined): CompactProgress {
-  if (status === 'completed' || status === 'skipped') return progressValue('Task', 100, 'exact')
-  if (status === 'running') return progressValue('Task', 50, 'low')
-  if (status === 'blocked' || status === 'failed') return progressValue('Task', 0, 'low')
-  return progressValue('Task', 0, 'exact')
+  if (status === 'completed' || status === 'skipped') return progressValue('Task', 1, 1)
+  return progressValue('Task', 0, 0)
 }
 
 export function buildCompactStatusProjection(job: AgentJob): CompactStatusProjection {
@@ -1092,8 +1105,8 @@ export function buildCompactStatusProjection(job: AgentJob): CompactStatusProjec
     || activePhase?.tasks[activePhase.tasks.length - 1]
   const completedOverall = allTasks.filter(task => task.status === 'completed' || task.status === 'skipped').length
   const completedPhase = activePhase?.tasks.filter(task => task.status === 'completed' || task.status === 'skipped').length || 0
-  const overall = progressValue('Overall', boundedPercent(completedOverall, allTasks.length), 'exact')
-  const phase = progressValue('Phase', boundedPercent(completedPhase, activePhase?.tasks.length || 0), 'exact')
+  const overall = progressValue('Run overall', completedOverall, allTasks.length)
+  const phase = progressValue('Run phase', completedPhase, activePhase?.tasks.length || 0)
   const task = taskProgress(activeTask?.status)
   const deltaCount = Math.max(0, Math.floor(job.lastAcceptedTaskDelta || 0))
   const deltaPercent = boundedPercent(deltaCount, allTasks.length)
@@ -1105,13 +1118,15 @@ export function buildCompactStatusProjection(job: AgentJob): CompactStatusProjec
     phaseTitle && taskTitle ? `${phaseTitle} → ${taskTitle}` : taskTitle || phaseTitle || 'No active task',
     240
   ) || 'No active task'
+  const narrowPosition = compactText(currentPosition, 215) || 'No active task'
   const header = `${job.sourceId} · ${job.id} · ${job.status}`
-  const deltaLabel = deltaCount > 0 ? ` (+${deltaPercent})` : ''
+  const progressLabel = (progress: CompactProgress) => progress.percent === undefined ? '—' : `${progress.percent}%`
+  const deltaLabel = deltaCount > 0 ? ` (+${deltaCount} task${deltaCount === 1 ? '' : 's'})` : ''
   const text = [
     header,
-    `Overall  ${overall.bar} ${overall.percent}%${deltaLabel}`,
-    `Phase    ${phase.bar} ${phase.percent}%`,
-    `Task     ${task.bar} ${task.percent}%${task.confidence === 'low' ? ' (estimate)' : ''}`,
+    `Run overall  ${overall.bar} ${progressLabel(overall)}${deltaLabel}`,
+    `Run phase    ${phase.bar} ${progressLabel(phase)}`,
+    `Task     ${task.bar} ${progressLabel(task)}`,
     `Current position: ${currentPosition}`,
     blocker ? `Blocker: ${blocker}` : undefined,
     nextAction ? `Next action: ${nextAction}` : undefined,
@@ -1119,8 +1134,8 @@ export function buildCompactStatusProjection(job: AgentJob): CompactStatusProjec
   ].filter(Boolean).join('\n')
   const narrowText = [
     header,
-    `O ${overall.percent}% · P ${phase.percent}% · T ${task.percent}%${task.confidence === 'low' ? '~' : ''}${deltaCount > 0 ? ` · Δ+${deltaPercent}` : ''}`,
-    currentPosition,
+    `O ${progressLabel(overall)} · P ${progressLabel(phase)} · T ${progressLabel(task)}${deltaCount > 0 ? ` · Δ+${deltaCount} task${deltaCount === 1 ? '' : 's'}` : ''}`,
+    narrowPosition,
     blocker ? `Blocked: ${blocker}` : nextAction ? `Next: ${nextAction}` : undefined
   ].filter(Boolean).join('\n')
 
@@ -1142,7 +1157,7 @@ export function buildCompactStatusProjection(job: AgentJob): CompactStatusProjec
     nextAction,
     executionProfile: { engine: 'direct', autonomy: job.autonomyLevel },
     text: compactText(text, 1200) || '',
-    narrowText: compactText(narrowText, 520) || ''
+    narrowText: compactText(narrowText, 515) || ''
   }
 }
 
@@ -1401,7 +1416,7 @@ export function canReuseWorkbenchSessionForCommand(input: WorkbenchActionSession
   return true
 }
 
-export function ensureWorkbenchActionRun(params: { sourceId: string; goal: string; requestId?: string }): WorkbenchActionRunBinding {
+export function ensureWorkbenchActionRun(params: { sourceId: string; goal: string; requestId?: string; session?: WorkbenchSessionStoreOptions }): WorkbenchActionRunBinding {
   const sourceId = String(params.sourceId || '').trim()
   const goal = sanitizeGoal(params.goal)
   if (!sourceId) throw new Error('sourceId is required')
@@ -1409,7 +1424,7 @@ export function ensureWorkbenchActionRun(params: { sourceId: string; goal: strin
   const active = getActiveWorkbenchRun(sourceId)
   const reusable = active
     && !isReconciledStaleWorkbenchRun(active as { status: string; blockedReason?: string })
-    && canReuseWorkbenchSessionForCommand({ sourceId, goal, run: active })
+    && canReuseWorkbenchSessionForCommand({ sourceId, goal, run: active, session: params.session })
   if (!reusable) {
     // A paused/blocked/recovery-required run is historical recovery state, not
     // a valid bootstrap session for a fresh read. Starting a bounded action run
@@ -1423,7 +1438,8 @@ export function ensureWorkbenchActionRun(params: { sourceId: string; goal: strin
       maxIterations: 1,
       autoCommit: false,
       autoPush: false,
-      autonomyLevel: 'hands_off_safe'
+      autonomyLevel: 'hands_off_safe',
+      session: params.session
     })
     appendAgentEvent({
       jobId: run.id,

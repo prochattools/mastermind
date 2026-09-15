@@ -44,6 +44,9 @@ export function classifyPortableOperationError(error: unknown): PortableOperatio
   if (normalized.includes('source mismatch') || (normalized.includes('source') && (normalized.includes('mismatch') || normalized.includes('does not match')))) {
     return new PortableOperationError('source_mismatch', message)
   }
+  if (normalized.includes('strict validation') || normalized.includes('invalid_workbench_command_request')) {
+    return new PortableOperationError('invalid_request', message)
+  }
   if (normalized.includes('session')) return new PortableOperationError('session_invalid', message)
   if (normalized.includes('confirmation')) return new PortableOperationError('invalid_confirmation', message)
   if (normalized.includes('stale') && normalized.includes('head')) return new PortableOperationError('stale_head', message)

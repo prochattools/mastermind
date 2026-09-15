@@ -2,6 +2,7 @@ node_modules/
 dist/
 build/
 .next/
+**/next-env.d.ts
 .env
 .env.local
 .env.*.local
@@ -34,6 +35,8 @@ workbench-final-build/
 
 # Quiet-window/local diagnostic artifacts; preserve locally without polluting release cleanliness.
 artifacts/benchmarks/benchmark-phase-q-e14d6a18.json
+artifacts/benchmarks/benchmark-phase-q-*.json
+artifacts/benchmarks/maturity-lab-*.json
 scripts/inspect-live-scheduler-state.mjs
 scripts/validation-live-load-fixture.mjs
 

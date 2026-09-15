@@ -2,9 +2,15 @@ import crypto from 'crypto'
 import type { AgentJob, AgentJobStatus, AgentAutonomyLevel } from './agent-jobs'
 import type { WorkbenchPacketRecord, WorkbenchPacketStatus } from './workbench-packet-store'
 
-export const RESUME_PROJECTION_SCHEMA_VERSION = 1 as const
+export const RESUME_PROJECTION_SCHEMA_VERSION = 3 as const
 
 export type ResumeValidationState = 'pending' | 'passed' | 'failed' | 'unknown'
+
+export type ResumeProgressMetric = {
+  completed: number
+  total: number
+  percent?: number
+}
 
 export type ResumeProjection = {
   schemaVersion: typeof RESUME_PROJECTION_SCHEMA_VERSION
@@ -43,7 +49,13 @@ export type ResumeProjection = {
     exhausted: boolean
     reasonCode?: string
   }
+  progress: {
+    overall: ResumeProgressMetric
+    phase: ResumeProgressMetric
+    task: ResumeProgressMetric
+  }
   currentPosition: string
+  completedThisTurn?: string
   nextAction?: string
   freshness: {
     runVersion: number
@@ -110,6 +122,16 @@ function hashProjection(value: Omit<ResumeProjection, 'contentHash'>): string {
   return crypto.createHash('sha256').update(canonical(value)).digest('hex')
 }
 
+function progressMetric(completed: number, total: number): ResumeProgressMetric {
+  const safeCompleted = Math.max(0, Math.floor(completed))
+  const safeTotal = Math.max(0, Math.floor(total))
+  return {
+    completed: Math.min(safeCompleted, safeTotal),
+    total: safeTotal,
+    ...(safeTotal > 0 ? { percent: Math.min(100, Math.max(0, Math.round((safeCompleted / safeTotal) * 100))) } : {})
+  }
+}
+
 export function buildResumeProjection(input: ResumeProjectionInput): ResumeProjection {
   const run = input.run
   const { phase, task } = activePhaseAndTask(run)
@@ -120,6 +142,16 @@ export function buildResumeProjection(input: ResumeProjectionInput): ResumeProje
   const confirmationReason = boundedText(run.confirmationReason, MAX_REASON)
   const nextAction = boundedText(run.nextActions?.[0] || run.resumeState?.instructions?.[0], MAX_ACTION)
   const repository = boundedText(input.repository || run.sourceId, MAX_TITLE) || 'unknown'
+  const allTasks = run.roadmapPhases.flatMap(item => item.tasks)
+  const completedOverall = allTasks.filter(item => item.status === 'completed' || item.status === 'skipped').length
+  const phaseTasks = phase?.tasks || []
+  const completedPhase = phaseTasks.filter(item => item.status === 'completed' || item.status === 'skipped').length
+  const taskProgress = task?.status === 'completed' || task?.status === 'skipped'
+    ? progressMetric(1, 1)
+    : progressMetric(0, 0)
+  const completedThisTurn = run.lastAcceptedTaskDelta > 0
+    ? `Last accepted update completed ${run.lastAcceptedTaskDelta} bounded task${run.lastAcceptedTaskDelta === 1 ? '' : 's'}.`
+    : undefined
   const policyIdentity = safeId(input.policyIdentity || DEFAULT_POLICY_IDENTITY)
   const confirmationIdentity = `${run.requiresConfirmation === true ? 'required' : 'clear'}:${confirmationReason || 'none'}`.slice(0, MAX_REASON)
   const taskIdentity = task ? `${safeId(phase?.id)}:${safeId(task.id)}:${task.status}` : undefined
@@ -179,7 +211,13 @@ export function buildResumeProjection(input: ResumeProjectionInput): ResumeProje
       exhausted: run.executionBudget.exhausted,
       ...(run.executionBudget.reasonCode ? { reasonCode: run.executionBudget.reasonCode } : {})
     },
+    progress: {
+      overall: progressMetric(completedOverall, allTasks.length),
+      phase: progressMetric(completedPhase, phaseTasks.length),
+      task: taskProgress
+    },
     currentPosition,
+    ...(completedThisTurn ? { completedThisTurn } : {}),
     ...(nextAction ? { nextAction } : {}),
     freshness: {
       runVersion: Number.isFinite(run.runVersion) ? run.runVersion : 1,

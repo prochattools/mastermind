@@ -41,6 +41,7 @@ export type PromptPacketTransportContract = {
     executionProfile: ExecutionSelectionProfile
   }
   goalSummary: string
+  goalDispatch?: WorkbenchPacket['goalDispatch']
   exactPaths: string[]
   exactSymbols: string[]
   steps: Array<{
@@ -147,13 +148,22 @@ export function renderCodexPrompt(contract: PromptPacketTransportContract): stri
     `Execute packet ${contract.packetId} for task ${contract.taskId}.`,
     `Goal: ${contract.goalSummary}`,
     `Expected HEAD: ${contract.expectedHead}`,
+    contract.goalDispatch?.readOnly === true
+      ? `This is a read-only delegated Workbench task. Use only the project-scoped Workbench MCP tools for repository access; do not use shell, Git, network, credentials, or any other MCP server. Before answering, perform every bounded request in order: call readWorkbenchContext once, then call runWorkbenchCommand once for each listed command, in listed order. For each command, pass exactly {"version":2,"sessionId":"<the sessionId returned by readWorkbenchContext>","command":{"sourceId":"${contract.sourceId}","commandKind":"<the listed command kind>"}}; do not add runId, packetId, taskId, requestId, or any other fields. Do not call getWorkbenchStatus or stop after a partial result. Bounded MCP request: ${JSON.stringify({ scope: contract.goalDispatch.scope, reads: contract.goalDispatch.reads || [], commands: contract.goalDispatch.commands || [] })}`
+      : contract.goalDispatch
+        ? `This is a governed Workbench mutation in an isolated worktree. Use only the project-scoped Workbench MCP tools for repository context; call readWorkbenchContext once, then runWorkbenchCommand once for each listed command in order, using the returned sessionId exactly. Use shell only to make the one admitted change in the isolated worktree. Do not call applyWorkbenchFileChange or commitWorkbenchChanges. Do not use Git to commit, push, publish, or deploy, and stop if MCP context is unavailable. Bounded MCP request: ${JSON.stringify({ scope: contract.goalDispatch.scope, reads: contract.goalDispatch.reads || [], commands: contract.goalDispatch.commands || [] })}`
+      : undefined,
     `Modify only: ${contract.exactPaths.join(', ') || 'no paths'}.`,
     `Run validations: ${contract.validation.map(item => item.commandKind).join(', ') || 'none'}.`,
-    contract.restrictions.commitEnabled ? `Commit only after validation with: ${contract.restrictions.commitMessage || 'the packet-approved message'}.` : 'Do not commit.',
+    contract.goalDispatch
+      ? contract.restrictions.commitEnabled
+        ? 'Workbench, not Codex, will perform the one explicitly authorized commit after the delegated mutation and validation pass. Do not commit.'
+        : 'Do not commit.'
+      : contract.restrictions.commitEnabled ? `Commit only after validation with: ${contract.restrictions.commitMessage || 'the packet-approved message'}.` : 'Do not commit.',
     'Do not push, publish, or deploy.',
     `Contract hash: ${contract.contentHash}`,
     `Idempotency key: ${contract.idempotencyKey}`
-  ].join('\n')
+  ].filter((line): line is string => Boolean(line)).join('\n')
 }
 
 function renderAdapter(contract: PromptPacketTransportContract): string {
@@ -221,6 +231,7 @@ export function compilePromptPacket(input: PromptPacketCompilerInput): PromptPac
       executionProfile: input.execution.profile
     },
     goalSummary: boundedText(input.packet.goalSummary),
+    ...(input.packet.goalDispatch ? { goalDispatch: input.packet.goalDispatch } : {}),
     exactPaths,
     exactSymbols,
     steps: input.packet.steps.map(step => ({ type: step.type, path: step.path, ...(step.to ? { to: step.to } : {}) })),

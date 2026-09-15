@@ -58,6 +58,27 @@ test('returns exact evidence and optional CBM navigation in one bounded packet',
   assert.ok(Buffer.byteLength(JSON.stringify(result), 'utf8') <= 8 * 1024)
 })
 
+test('uses supplied exact paths without semantic search', async () => {
+  let searchCalls = 0
+  const result = await prepareTaskContext({
+    query: 'known task',
+    sourceIds: ['repo'],
+    paths: ['src/known.ts'],
+    searcher: {
+      searchBounded: () => {
+        searchCalls += 1
+        return { results: [], sourceWarnings: [], partial: false }
+      }
+    } as never,
+    readExactFile: async (filePath, sourceId) => ({ path: filePath, sourceId, content: 'export const known = true' })
+  })
+
+  assert.equal(searchCalls, 0)
+  assert.equal(result.exactVerification, true)
+  assert.deepEqual(result.exactEvidence.map(item => item.path), ['src/known.ts'])
+  assert.ok(result.searchNotes.some(note => note.includes('semantic search was skipped')))
+})
+
 test('fails closed when exact source verification is incomplete', async () => {
   let readCalls = 0
   const result = await prepareTaskContext({

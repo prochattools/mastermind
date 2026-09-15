@@ -1,4 +1,5 @@
 import Fastify from 'fastify'
+import { execFileSync } from 'node:child_process'
 import crypto from 'crypto'
 import fs from 'fs'
 import { promises as fsp } from 'fs'
@@ -31,9 +32,9 @@ import { preflightWorkbenchPacket, type WorkbenchPacket } from './workbench-pack
 import { planWorkbenchPacketExecution } from './workbench-packet-plan'
 import { executeWorkbenchPacket } from './workbench-packet-executor'
 import { recoverWorkbenchExecutionJournals } from './workbench-execution-journal'
-import { getWorkbenchPacketResult } from './workbench-packet-results'
+import { getWorkbenchPacketResult, recordWorkbenchPacketResult } from './workbench-packet-results'
 import { drainQueuedWorkbenchPackets, scheduleWorkbenchPacket } from './workbench-packet-coordinator'
-import { claimNextWorkbenchPacket, compactWorkbenchPacketLeaseRecord, controlWorkbenchPacketsForRun, getWorkbenchPacketRecord, listWorkbenchPacketRecords, recoverInterruptedWorkbenchPacket, recoverStaleWorkbenchPacketLeases, releaseWorkbenchPacketLease, renewWorkbenchPacketLease, reserveWorkbenchPacket } from './workbench-packet-store'
+import { claimNextWorkbenchPacket, compactWorkbenchPacketLeaseRecord, controlWorkbenchPacketsForRun, getWorkbenchPacketRecord, listWorkbenchPacketRecords, recoverInterruptedWorkbenchPacket, recoverStaleWorkbenchPacketLeases, releaseWorkbenchPacketLease, renewWorkbenchPacketLease, reserveWorkbenchPacket, updateWorkbenchPacketStatus } from './workbench-packet-store'
 import { dispatchWorkbenchGoal, getWorkbenchGoalTerminalResult, type WorkbenchGoalDispatchInput } from './workbench-goal-dispatch'
 import { compileNativeGoal, validateNativeGoalPaths } from './native-goal-compiler'
 import { projectCodexProviderStatus } from './codex-provider-status'
@@ -49,6 +50,8 @@ import { pruneWorkbenchEvidence } from './workbench-evidence-store'
 import { pruneWorkbenchReadResultRecovery } from './workbench-read-result-recovery'
 import { pruneWorkbenchSessions } from './workbench-session-store'
 import { continuationHintPaths, mergeFollowUpPaths, normalizeFollowUpContext, type WorkbenchContinuationContext } from './workbench-follow-up-context'
+import { routeAdaptiveExecution } from './adaptive-execution-router'
+import type { WorkbenchExecutorResult } from '../../../mcp/dist/executor-broker.js'
 
 let cliVersion = process.env.WORKBENCH_PACKAGE_VERSION || 'unknown'
 try {
@@ -61,6 +64,8 @@ const agentProcessStartedAt = new Date().toISOString()
 import { createCodexDelegationAdapter } from './external-delegation-adapter'
 import { getPersistedDelegationOperation } from './external-delegation-store'
 import type { PromptPacketTransportContract } from './prompt-packet-compiler'
+import { commitGovernedCodexMutation } from './governed-codex-commit'
+import { disposeDelegatedWorkbenchWorktree, getDelegatedWorkbenchWorktree } from './workbench-delegated-worktree'
 
 export async function startLocalServer(port: number = 3052): Promise<void> {
   const fastify = Fastify({ logger: true })
@@ -214,7 +219,8 @@ export async function startLocalServer(port: number = 3052): Promise<void> {
   }
   reconcileIndexStateFromDocs(indexer.getDocs(), getSourcesSafe())
   const codexDelegationAdapter = createCodexDelegationAdapter({
-    onLifecycle: activity => {
+    requireProjectMcp: true,
+    onLifecycle: async activity => {
       const terminal = activity.lifecycle === 'completed' || activity.lifecycle === 'failed' || activity.lifecycle === 'cancelled' || activity.lifecycle === 'ambiguous'
       const control = activity.lifecycle === 'cancellation_requested'
       const eventType = control ? 'control_requested' : terminal ? activity.lifecycle === 'completed' ? 'command_completed' : 'command_failed' : 'command_started'
@@ -239,6 +245,60 @@ export async function startLocalServer(port: number = 3052): Promise<void> {
         packetId: activity.packetId,
         paths: activity.changedPaths,
         evidenceRefs: [{ kind: 'packet', ref: activity.packetId }, { kind: 'event', ref: activity.operationId }]
+      })
+      if (!terminal) return
+      const operation = getPersistedDelegationOperation(activity.operationId)
+      const result = codexDelegationAdapter.evidence(activity.operationId)
+      if (!operation || !result) return
+      const packet = getWorkbenchPacketRecord(activity.packetId)
+      if (!packet || ['completed', 'failed', 'cancelled'].includes(packet.status)) return
+      const wantsCommit = packet.packet.commit?.enabled === true
+      const worktree = result.mutation?.worktreeId ? getDelegatedWorkbenchWorktree(result.mutation.worktreeId) : undefined
+      const commitOutcome = wantsCommit
+        ? worktree
+          ? await commitGovernedCodexMutation({ operation, packet: packet.packet, result, worktree })
+          : { ok: false as const, code: 'CODEX_COMMIT_WORKTREE_MISSING', message: 'The isolated worktree record is missing.', commitAttempted: false }
+        : { ok: true as const, committed: false as const }
+      const commitError = commitOutcome.ok === false ? `${commitOutcome.code}: ${commitOutcome.message}` : undefined
+      const commitAmbiguous = commitOutcome.ok === false && commitOutcome.code === 'CODEX_COMMIT_AMBIGUOUS'
+      const packetStatus = commitError ? 'failed' : result.lifecycle === 'completed' ? 'completed' : result.lifecycle === 'cancelled' ? 'cancelled' : 'failed'
+      const commitHash = commitOutcome.ok && commitOutcome.committed ? commitOutcome.commitHash : undefined
+      const executorResult: WorkbenchExecutorResult = {
+        submissionId: operation.operationId,
+        executorId: 'codex-cli',
+        state: packetStatus === 'completed' ? 'completed' : result.lifecycle === 'ambiguous' || commitAmbiguous ? 'timeout' : packetStatus === 'cancelled' ? 'cancelled' : 'failed',
+        evidence: {
+          filesChanged: result.changedPaths,
+          validationPassed: packetStatus === 'completed',
+          ...(commitHash ? { commitHash } : result.commitIdentity ? { commitHash: result.commitIdentity } : {}),
+          outputSummary: commitError || result.summary || `Codex delegation ended with ${result.lifecycle}.`,
+          ...(result.mutation ? { mutation: result.mutation } : {})
+        },
+        completedAt: new Date().toISOString(),
+        durationMs: result.durationMs
+      }
+      updateWorkbenchPacketStatus({ packetId: activity.packetId, status: packetStatus, commitHash, failureReason: commitError || result.errors[0] || (result.lifecycle === 'ambiguous' ? 'Codex delegation requires reconciliation.' : undefined) })
+      recordWorkbenchPacketResult({
+        packetId: activity.packetId,
+        runId: activity.runId,
+        sourceId: activity.sourceId,
+        status: packetStatus,
+        sourceRoot: getSourcesSafe().find(source => source.id === activity.sourceId)?.path,
+        executorResult,
+        error: packetStatus === 'completed' ? undefined : commitError || result.errors[0] || `Codex delegation ended with ${result.lifecycle}.`
+      })
+      if (worktree) disposeDelegatedWorkbenchWorktree({ worktreeId: worktree.worktreeId, terminalState: packetStatus === 'completed' ? 'complete' : packetStatus === 'cancelled' ? 'cancelled' : 'failed' })
+      const run = getAgentJob(activity.runId)
+      if (!run) return
+      const ambiguous = result.lifecycle === 'ambiguous' || commitAmbiguous
+      updateAgentJob(run.id, {
+        status: packetStatus === 'completed' ? 'completed' : ambiguous ? 'blocked' : packetStatus === 'cancelled' ? 'cancelled' : 'failed',
+        activePacketId: undefined,
+        activeTaskId: undefined,
+        completedPacketIds: packetStatus === 'completed' ? Array.from(new Set([...run.completedPacketIds, activity.packetId])) : run.completedPacketIds,
+        currentCommit: commitHash || run.currentCommit,
+        summary: commitError || result.summary || (ambiguous ? 'Codex delegation ended ambiguously; reconcile the persisted provider state before retrying.' : `Codex delegated goal ${result.lifecycle}.`),
+        ...(ambiguous ? { blockedReason: commitError || 'Codex delegation requires provider reconciliation; no duplicate submission was attempted.' } : {})
       })
     }
   })
@@ -973,7 +1033,7 @@ export async function startLocalServer(port: number = 3052): Promise<void> {
   fastify.post<{ Body: { sourceId: string; goal: string; documentationPath?: string; maxIterations?: number; autoCommit?: boolean; nativeDirectGoal?: boolean; nativeGoalPaths?: string[]; confirmedByUser?: boolean; executionMode?: 'auto' | 'direct' | 'codex'; goalDispatch?: WorkbenchGoalDispatchInput; followUpContext?: unknown } }>('/api/workbench-runs/create', async (request, reply) => {
     try {
       const { sourceId, goal, documentationPath, maxIterations, autoCommit, nativeDirectGoal, nativeGoalPaths, followUpContext: rawFollowUpContext } = request.body || {}
-      const executionMode = request.body?.executionMode === 'codex' || request.body?.executionMode === 'direct' || request.body?.executionMode === 'auto'
+      const requestedExecutionMode = request.body?.executionMode === 'codex' || request.body?.executionMode === 'direct' || request.body?.executionMode === 'auto'
         ? request.body.executionMode
         : nativeDirectGoal === true ? 'direct' : 'auto'
       const source = getSourcesSafe().find(item => item.id === sourceId && item.enabled && isSourcePathAvailable(item.path))
@@ -981,7 +1041,7 @@ export async function startLocalServer(port: number = 3052): Promise<void> {
       let continuation: WorkbenchContinuationContext | undefined
       if (rawFollowUpContext !== undefined && rawFollowUpContext !== null) {
         const normalized = normalizeFollowUpContext(rawFollowUpContext, sourceId)
-        if (normalized.ok === false) return reply.code(409).header('Cache-Control', 'no-store').send({ status: 'blocked', verified: false, executionMode, error: { code: normalized.code, message: normalized.message } })
+        if (normalized.ok === false) return reply.code(409).header('Cache-Control', 'no-store').send({ status: 'blocked', verified: false, executionMode: requestedExecutionMode, error: { code: normalized.code, message: normalized.message } })
         continuation = normalized.context
       }
       let validatedNativeGoalPaths: string[] = []
@@ -991,7 +1051,7 @@ export async function startLocalServer(port: number = 3052): Promise<void> {
         return reply.code(409).header('Cache-Control', 'no-store').send({
           status: 'blocked',
           verified: false,
-          executionMode,
+          executionMode: requestedExecutionMode,
           error: { code: 'NATIVE_GOAL_PATH_BLOCKED', message: error instanceof Error ? error.message : 'Attached repository context could not be validated.' }
         })
       }
@@ -1004,6 +1064,18 @@ export async function startLocalServer(port: number = 3052): Promise<void> {
         || continuation
         ? { scope: effectiveGoalPaths, knownFiles: knownContextPaths, ...(continuation ? { continuation } : {}) }
         : undefined
+      let codexCapability: ReturnType<typeof codexDelegationAdapter.capability> | undefined
+      const getCodexCapability = () => codexCapability || (codexCapability = codexDelegationAdapter.capability())
+      const adaptive = routeAdaptiveExecution({
+        goal,
+        sourceId,
+        requestedMode: requestedExecutionMode,
+        codexAvailable: () => getCodexCapability().supported
+      })
+      const executionMode = adaptive.selectedMode
+      const providerStatus = codexCapability
+        ? projectCodexProviderStatus({ directCapability: true, availability: codexCapability.supported ? 'available' : 'unavailable', reason: codexCapability.supported ? 'Codex CLI capability probe passed.' : 'Codex unavailable. Continue with Instant Mode?' })
+        : projectCodexProviderStatus({ directCapability: true })
       if (executionMode !== 'codex' || nativeDirectGoal === true) {
         const compilation = await compileNativeGoal({
           goal,
@@ -1018,7 +1090,7 @@ export async function startLocalServer(port: number = 3052): Promise<void> {
           return reply.code(409).header('Cache-Control', 'no-store').send({
             status: 'blocked',
             verified: false,
-            executionMode, providerStatus: projectCodexProviderStatus({ directCapability: true }), nativeGoal: { intent: compilation.intent, route: compilation.route, reviewMessage: compilation.reviewMessage, compilerMs: compilation.compilerMs },
+            executionMode, providerStatus, nativeGoal: { intent: compilation.intent, route: compilation.route, reviewMessage: compilation.reviewMessage, compilerMs: compilation.compilerMs },
             error: { code: 'NATIVE_GOAL_REVIEW_REQUIRED', message: compilation.reviewMessage }
           })
         }
@@ -1035,7 +1107,7 @@ export async function startLocalServer(port: number = 3052): Promise<void> {
           })
           return reply.code(result.status === 'blocked' ? 409 : 202).header('Cache-Control', 'no-store').send({
             ...result,
-            executionMode, providerStatus: projectCodexProviderStatus({ directCapability: true }), nativeGoal: { intent: compilation.intent, route: compilation.route, reviewMessage: compilation.reviewMessage, compilerMs: compilation.compilerMs }
+            executionMode, providerStatus, nativeGoal: { intent: compilation.intent, route: compilation.route, reviewMessage: compilation.reviewMessage, compilerMs: compilation.compilerMs }
           })
         }
         const roadmap = createWorkbenchRun({ sourceId, goal, goalContext, documentationPath, maxIterations, autoCommit, autoPush: false, autonomyLevel: 'hands_off_safe' })
@@ -1044,7 +1116,7 @@ export async function startLocalServer(port: number = 3052): Promise<void> {
           created: roadmap.created,
           verified: true,
           executionMode,
-          providerStatus: projectCodexProviderStatus({ directCapability: true }),
+          providerStatus,
           run: getActiveWorkbenchRun(sourceId),
           nativeGoal: { intent: compilation.intent, route: compilation.route, reviewMessage: compilation.reviewMessage, compilerMs: compilation.compilerMs }
         })
@@ -1058,7 +1130,14 @@ export async function startLocalServer(port: number = 3052): Promise<void> {
           documentationPath,
           maxIterations,
           dispatch: request.body.goalDispatch,
-          goalContext
+          goalContext,
+          ...(executionMode === 'codex' ? {
+            codex: {
+              adapter: codexDelegationAdapter,
+              branch: execFileSync('git', ['branch', '--show-current'], { cwd: source.path, encoding: 'utf8', timeout: 3_000, stdio: ['ignore', 'pipe', 'pipe'] }).trim(),
+              ownerSessionId: `workbench-run:${request.body.goalDispatch.version}:${requestIdFrom(request, request.body) || 'local'}`
+            }
+          } : {})
         })
         return reply.code(result.status === 'blocked' ? 409 : 202).header('Cache-Control', 'no-store').send(result)
       }
@@ -1068,7 +1147,7 @@ export async function startLocalServer(port: number = 3052): Promise<void> {
         created: result.created,
         verified: true,
         executionMode,
-        providerStatus: projectCodexProviderStatus({ directCapability: true }),
+        providerStatus,
         run: getActiveWorkbenchRun(sourceId)
       })
     } catch (err) {

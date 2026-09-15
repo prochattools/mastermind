@@ -71,6 +71,7 @@ export type ExecutionSelectionInput = {
   request: NormalizedRequestIntent
   capabilities: ExecutionSelectionCapability[]
   fallbackMode?: 'fallback' | 'reject'
+  preferredEngine?: Exclude<ExecutionSelectionEngine, 'human'>
 }
 
 const MAX_REPORT_BYTES = 320
@@ -111,6 +112,9 @@ function evaluateProfile(request: NormalizedRequestIntent, requirements: Executi
   }
   if (requirements.requiresLargePackets || requirements.requiresProtectedPaths) {
     return { profile: 'frontier', reasonCode: 'profile_frontier_risk_boundary' }
+  }
+  if (request.execution.engine === 'direct' && request.mode !== 'goal') {
+    return { profile: 'economy', reasonCode: 'profile_economy_direct_intent' }
   }
   if (request.packet.kind === 'implementation' || request.packet.steps === 'small_batch' || request.mode === 'goal') {
     return { profile: 'balanced', reasonCode: 'profile_balanced_bounded_work' }
@@ -160,7 +164,9 @@ function selectForProfile(
   request: NormalizedRequestIntent,
   capabilities: ExecutionSelectionCapability[],
   profile: ExecutionSelectionProfile,
-  requirements: ExecutionSelectionRequirements
+  requirements: ExecutionSelectionRequirements,
+  preferredEngine?: Exclude<ExecutionSelectionEngine, 'human'>,
+  fallbackMode: 'fallback' | 'reject' = 'fallback'
 ): {
   outcome: ExecutionSelectionOutcome
   engine: ExecutionSelectionEngine
@@ -187,8 +193,11 @@ function selectForProfile(
     }
   }
 
-  const ranked = PROFILE_ORDER[profile]
+  const ranked = preferredEngine
+    ? [preferredEngine, ...PROFILE_ORDER[profile].filter(engine => engine !== preferredEngine)]
+    : PROFILE_ORDER[profile]
   for (const [index, engine] of ranked.entries()) {
+    if (index > 0 && fallbackMode === 'reject') break
     const capability = capabilities.find(item => item.engine === engine)
     if (!isCapabilityEligible(capability, requirements, profile)) continue
     return {
@@ -225,7 +234,8 @@ function evaluateComparison(
   request: NormalizedRequestIntent,
   capabilities: ExecutionSelectionCapability[],
   selectedProfile: ExecutionSelectionProfile,
-  requirements: ExecutionSelectionRequirements
+  requirements: ExecutionSelectionRequirements,
+  preferredEngine?: Exclude<ExecutionSelectionEngine, 'human'>
 ): ExecutionSelectionComparison {
   const lowerCostProfile = PROFILE_DOWNGRADE[selectedProfile]
   if (!lowerCostProfile) {
@@ -236,7 +246,7 @@ function evaluateComparison(
     }
   }
 
-  const lowerCostSelection = selectForProfile(request, capabilities, lowerCostProfile, requirements)
+  const lowerCostSelection = selectForProfile(request, capabilities, lowerCostProfile, requirements, preferredEngine)
   return {
     selectedProfile,
     lowerCostProfile,
@@ -283,7 +293,9 @@ export function selectExecutionPlan(input: ExecutionSelectionInput): ExecutionSe
   const requirements = evaluateRequirements(input.request)
   const profileResult = evaluateProfile(input.request, requirements)
   const capabilitySummary = summarizeCapabilities(input.capabilities, requirements)
-  const primary = selectForProfile(input.request, input.capabilities, profileResult.profile, requirements)
+  const primary = selectForProfile(input.request, input.capabilities, profileResult.profile, requirements, input.preferredEngine, input.fallbackMode || 'fallback')
+  // Cost comparison is intentionally preference-independent: an explicit
+  // Codex choice still needs to show whether Instant is a viable cheaper path.
   const comparison = evaluateComparison(input.request, input.capabilities, profileResult.profile, requirements)
   const health: ExecutionSelectionHealth =
     primary.outcome === 'rejected' ? 'blocked'

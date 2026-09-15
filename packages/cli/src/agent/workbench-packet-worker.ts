@@ -242,6 +242,7 @@ export async function runNextWorkbenchPacket(params: {
       runId,
       sourceId,
       status: 'requeued',
+      sourceRoot,
       error: `Source root unavailable: ${sourceId}`
     })
     return {
@@ -300,6 +301,7 @@ export async function runNextWorkbenchPacket(params: {
         runId,
         sourceId,
         status: 'requeued',
+        sourceRoot,
         execution
       })
       return {
@@ -350,6 +352,7 @@ export async function runNextWorkbenchPacket(params: {
       runId,
       sourceId,
       status: execution.status,
+      sourceRoot,
       execution
     })
 
@@ -377,6 +380,7 @@ export async function runNextWorkbenchPacket(params: {
       runId,
       sourceId,
       status: 'requeued',
+      sourceRoot,
       error: message
     })
     return {

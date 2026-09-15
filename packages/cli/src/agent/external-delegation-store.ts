@@ -9,6 +9,9 @@ import {
   type DelegationAuthorization,
   type DelegationConfirmation,
   type DelegationEvidenceSummary,
+  type DelegationDeliveryEvidence,
+  type DelegationPullRequestEvidence,
+  type DelegationPullRequestObservation,
   type DelegationLifecycle,
   type ExternalDelegationOperation
 } from './external-delegation'
@@ -55,6 +58,72 @@ function isString(value: unknown, max = 240): value is string {
   return typeof value === 'string' && value.length > 0 && value.length <= max
 }
 
+function isDelivery(value: unknown): value is DelegationDeliveryEvidence {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false
+  const item = value as Partial<DelegationDeliveryEvidence>
+  return ['pushed', 'already_reconciled', 'blocked', 'failed', 'ambiguous'].includes(item.status || '')
+    && isString(item.remote, 200)
+    && isString(item.branch, 240)
+    && isString(item.commitHash, 64)
+    && Number.isInteger(item.durationMs)
+    && Number(item.durationMs) >= 0
+    && (item.previousRemoteHead === undefined || isString(item.previousRemoteHead, 64))
+    && (item.resultingRemoteHead === undefined || isString(item.resultingRemoteHead, 64))
+    && (item.reasonCode === undefined || isString(item.reasonCode, 120))
+}
+
+function isPullRequest(value: unknown): value is DelegationPullRequestEvidence {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false
+  const item = value as Partial<DelegationPullRequestEvidence>
+  return ['created', 'already_reconciled', 'blocked', 'failed', 'ambiguous'].includes(item.status || '')
+    && typeof item.pullRequestCreated === 'boolean'
+    && item.provider === 'github'
+    && isString(item.repository, 200)
+    && (item.number === undefined || (Number.isInteger(item.number) && Number(item.number) > 0))
+    && (item.url === undefined || isString(item.url, 500))
+    && item.draft === true
+    && isString(item.baseBranch, 120)
+    && isString(item.headBranch, 240)
+    && isString(item.headCommit, 64)
+    && isString(item.title, 120)
+    && ['absent', 'present'].includes(item.previousMatchingPr || '')
+    && ['not_required', 'pending', 'matched', 'mismatched', 'ambiguous', 'draft_changed', 'closed', 'merged', 'head_drift', 'base_mismatch', 'metadata_drift', 'not_found', 'provider_unavailable', 'authentication_unavailable'].includes(item.reconciliation || '')
+    && Number.isInteger(item.durationMs)
+    && Number(item.durationMs) >= 0
+    && (item.createdAt === undefined || isString(item.createdAt, 40))
+    && (item.reasonCode === undefined || isString(item.reasonCode, 120))
+    && (item.lastObserved === undefined || isPullRequestObservation(item.lastObserved))
+}
+
+function isPullRequestObservation(value: unknown): value is DelegationPullRequestObservation {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false
+  const item = value as Partial<DelegationPullRequestObservation>
+  const readiness = item.readiness
+  const readinessValid = readiness === undefined || (
+    typeof readiness === 'object' && readiness !== null && !Array.isArray(readiness)
+    && ['ready', 'not_ready', 'unknown'].includes(readiness.status || '')
+    && Array.isArray(readiness.reasons) && readiness.reasons.every(reason => isString(reason, 120))
+    && (readiness.mergeable === null || isString(readiness.mergeable, 40))
+    && (readiness.mergeStateStatus === null || isString(readiness.mergeStateStatus, 40))
+    && typeof readiness.checks === 'object' && readiness.checks !== null && !Array.isArray(readiness.checks)
+    && ['passing', 'failing', 'pending', 'unknown'].includes(readiness.checks.state || '')
+    && [readiness.checks.total, readiness.checks.passing, readiness.checks.failing, readiness.checks.pending, readiness.checks.unknown].every(value => Number.isInteger(value) && Number(value) >= 0)
+    && (readiness.checks.passing + readiness.checks.failing + readiness.checks.pending + readiness.checks.unknown === readiness.checks.total)
+    && (readiness.reviewDecision === null || isString(readiness.reviewDecision, 40))
+    && [readiness.approvals, readiness.changesRequested, readiness.reviewRequests].every(value => Number.isInteger(value) && Number(value) >= 0)
+    && ['satisfied', 'required', 'blocked', 'unknown'].includes(readiness.requiredReviews || '')
+    && ['available', 'unavailable', 'unknown'].includes(readiness.branchProtection || '')
+  )
+  return ['OPEN', 'CLOSED', 'MERGED'].includes(item.state || '')
+    && typeof item.draft === 'boolean'
+    && isString(item.headBranch, 240)
+    && isString(item.headCommit, 64)
+    && isString(item.baseBranch, 120)
+    && isString(item.title, 120)
+    && isString(item.observedAt, 40)
+    && readinessValid
+}
+
 function isRecord(value: unknown): value is PersistedDelegationOperation {
   if (!value || typeof value !== 'object') return false
   const item = value as Partial<PersistedDelegationOperation>
@@ -72,6 +141,8 @@ function isRecord(value: unknown): value is PersistedDelegationOperation {
     && isString(item.updatedAt, 40)
     && Number.isInteger(item.revision)
     && Number(item.revision) >= 0
+    && (item.delivery === undefined || isDelivery(item.delivery))
+    && (item.pullRequest === undefined || isPullRequest(item.pullRequest))
 }
 
 function readStore(options?: DelegationStoreOptions): DelegationStore | DelegationStoreFailure {
@@ -188,7 +259,7 @@ export function persistDelegationTransition(params: { operationId: string; expec
   })
 }
 
-export function persistDelegationControls(params: { operationId: string; expectedRevision: number; authorization?: DelegationAuthorization; confirmation?: DelegationConfirmation; evidence?: DelegationEvidenceSummary; cancellation?: PersistedDelegationOperation['cancellation']; reconciliation?: PersistedDelegationOperation['reconciliation']; now: string; options?: DelegationStoreOptions }): { ok: true; operation: PersistedDelegationOperation } | DelegationStoreFailure {
+export function persistDelegationControls(params: { operationId: string; expectedRevision: number; authorization?: DelegationAuthorization; confirmation?: DelegationConfirmation; evidence?: DelegationEvidenceSummary; delivery?: DelegationDeliveryEvidence; pullRequest?: DelegationPullRequestEvidence; cancellation?: PersistedDelegationOperation['cancellation']; reconciliation?: PersistedDelegationOperation['reconciliation']; now: string; options?: DelegationStoreOptions }): { ok: true; operation: PersistedDelegationOperation } | DelegationStoreFailure {
   return withLock(params.options, store => {
     const index = store.operations.findIndex(item => item.operationId === params.operationId)
     if (index < 0) return { ok: false, code: 'DELEGATION_NOT_FOUND', message: 'Delegation operation was not found.' } as DelegationStoreFailure
@@ -199,6 +270,8 @@ export function persistDelegationControls(params: { operationId: string; expecte
       ...(params.authorization ? { authorization: params.authorization } : {}),
       ...(params.confirmation ? { confirmation: params.confirmation } : {}),
       ...(params.evidence ? { evidence: params.evidence } : {}),
+      ...(params.delivery ? { delivery: params.delivery } : {}),
+      ...(params.pullRequest ? { pullRequest: params.pullRequest } : {}),
       ...(params.cancellation ? { cancellation: params.cancellation } : {}),
       ...(params.reconciliation ? { reconciliation: params.reconciliation } : {}),
       updatedAt: params.now,

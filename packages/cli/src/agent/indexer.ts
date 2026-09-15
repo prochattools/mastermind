@@ -22,6 +22,7 @@ import {
   MAX_INDEX_SCAN_HARD_DEPTH,
   boundedScanOptions,
   indexFailureCodeForTermination,
+  isDeterministicallyNonTextualPath,
   type IndexScanBudgetOptions,
   type IndexScanFailureCode
 } from './index-scan-policy'
@@ -31,7 +32,7 @@ const YIELD_EVERY_FILES = 25
 const BUFFER_SAMPLE_BYTES = 4096
 const ALLOWED_HIDDEN_INDEX_PREFIXES = ['.kiro/']
 const ALLOWED_HIDDEN_INDEX_FILES = new Set(['.ai/current.md'])
-export { DEFAULT_IGNORE_PATTERNS, INDEX_SCAN_EXCLUSION_VERSION, INDEX_SCAN_POLICY_ID, INDEX_SCAN_POLICY_VERSION, MAX_INDEX_SCAN_BYTES, MAX_INDEX_SCAN_DIRECTORIES, MAX_INDEX_SCAN_ENTRIES_PER_DIRECTORY, MAX_INDEX_SCAN_FILES, MAX_INDEX_SCAN_WALL_TIME_MS, MAX_INDEXABLE_FILE_BYTES, MAX_INDEX_SCAN_DEPTH, MAX_INDEX_SCAN_HARD_DEPTH }
+export { DEFAULT_IGNORE_PATTERNS, INDEX_SCAN_EXCLUSION_VERSION, INDEX_SCAN_POLICY_ID, INDEX_SCAN_POLICY_VERSION, MAX_INDEX_SCAN_BYTES, MAX_INDEX_SCAN_DIRECTORIES, MAX_INDEX_SCAN_ENTRIES_PER_DIRECTORY, MAX_INDEX_SCAN_FILES, MAX_INDEX_SCAN_WALL_TIME_MS, MAX_INDEXABLE_FILE_BYTES, MAX_INDEX_SCAN_DEPTH, MAX_INDEX_SCAN_HARD_DEPTH, NON_TEXTUAL_INDEX_EXTENSIONS, isDeterministicallyNonTextualPath } from './index-scan-policy'
 export const MAX_INDEX_SCAN_RESULTS = POLICY_MAX_INDEX_SCAN_RESULTS
 
 export type IndexerOptions = {
@@ -98,6 +99,25 @@ const shouldIndexRelativePath = (filePath: string): boolean => {
 
 const yieldToEventLoop = async (): Promise<void> => {
   await new Promise<void>(resolve => setImmediate(resolve))
+}
+
+function isProbablyBinaryContent(buffer: Buffer): boolean {
+  const sample = buffer.subarray(0, Math.min(buffer.length, BUFFER_SAMPLE_BYTES))
+  for (const byte of sample) {
+    if (byte === 0) return true
+  }
+  return false
+}
+
+async function isProbablyBinaryFile(filePath: string): Promise<boolean> {
+  const handle = await fsp.open(filePath, 'r')
+  try {
+    const sample = Buffer.allocUnsafe(BUFFER_SAMPLE_BYTES)
+    const { bytesRead } = await handle.read(sample, 0, sample.length, 0)
+    return isProbablyBinaryContent(sample.subarray(0, bytesRead))
+  } finally {
+    await handle.close()
+  }
 }
 
 function globMatches(filePath: string, patterns: string[]): boolean {
@@ -262,11 +282,27 @@ export async function boundedSourceScan(rootPath: string, patterns: string[], ig
       if (base.filesConsidered >= effectiveLimits.maxFiles) { fail('file_budget', relative); break }
       let stat: fs.Stats
       try { stat = await fsp.stat(absolute) } catch { fail('io_error', relative); break }
+      // Preserve the file-count budget for every regular file, but account
+      // only textual candidates against the textual-byte budget. The Indexer
+      // already rejects these deterministic media/binary types; admitting
+      // them here would let them exhaust the budget before that filter runs.
+      base.filesConsidered++
+      band.files++
+      if (isDeterministicallyNonTextualPath(relative)) continue
+      // Apply the same bounded binary rule used by the Indexer before adding
+      // content to the textual-byte budget. A binary file with a misleading
+      // extension must not be able to exhaust that budget first.
+      try {
+        if (await isProbablyBinaryFile(absolute)) continue
+      } catch {
+        // Preserve the existing per-file read behavior: the Indexer will
+        // report an unreadable candidate as skipped rather than hiding it
+        // behind a scan-wide failure.
+      }
+
       const consideredBytes = Math.min(stat.size, MAX_INDEXABLE_BYTES)
       if (base.bytesConsidered + consideredBytes > effectiveLimits.maxBytes) { fail('byte_budget', relative); break }
-      base.filesConsidered++
       base.bytesConsidered += consideredBytes
-      band.files++
       band.bytes += consideredBytes
       if (!base.deepestLegitimatePath || depth > base.deepestLegitimatePath.split('/').length) base.deepestLegitimatePath = relative
       if (base.files.length >= MAX_INDEX_SCAN_RESULTS) { fail('result_limit', relative); break }
@@ -276,14 +312,6 @@ export async function boundedSourceScan(rootPath: string, patterns: string[], ig
   }
   if (base.terminationReason === 'completed' && symlinkRejected) base.terminationReason = 'symlink_rejected'
   return result()
-}
-
-const isProbablyBinaryContent = (buffer: Buffer): boolean => {
-  const sample = buffer.subarray(0, Math.min(buffer.length, BUFFER_SAMPLE_BYTES))
-  for (const byte of sample) {
-    if (byte === 0) return true
-  }
-  return false
 }
 
 function ensureIndexDir(): void {
@@ -368,7 +396,7 @@ export class Indexer {
 
       for (const filePath of scan.files) {
         try {
-          if (!shouldIndexRelativePath(filePath)) {
+          if (!shouldIndexRelativePath(filePath) || isDeterministicallyNonTextualPath(filePath)) {
             skippedFiles++
             continue
           }

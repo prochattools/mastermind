@@ -26,7 +26,7 @@ export type WorkbenchOversightRunProjection = {
   currentPhase?: string
   activeTask?: string
   currentPosition: string
-  completionPercent: number
+  completionPercent?: number
   health: WorkbenchOversightHealth
   blocker?: string
   nextAction?: string
@@ -110,7 +110,9 @@ function projectRun(input: WorkbenchOversightRunInput, nowMs: number, staleAfter
   const currentPhase = normalizeText(input.compactStatus.phaseTitle)
   const activeTask = normalizeText(input.compactStatus.taskTitle)
   const currentPosition = normalizeText(input.compactStatus.currentPosition) || 'No active task'
-  const completionPercent = Math.min(100, Math.max(0, Math.round(input.compactStatus.overall.percent)))
+  const completionPercent = input.compactStatus.overall.percent === undefined
+    ? undefined
+    : Math.min(100, Math.max(0, Math.round(input.compactStatus.overall.percent)))
   const stale = Number.isFinite(parseTimestamp(input.updatedAt)) ? nowMs - parseTimestamp(input.updatedAt) > staleAfterMs : true
   const lastEvidence = normalizeText(input.lastEvidence) || 'unknown'
   const statusSummary = summarizeStatus(input.status, stale)
@@ -232,14 +234,14 @@ export function aggregateWorkbenchOversight(input: WorkbenchOversightInput): Wor
     ...repositories.map(item => [
       `${item.repository} · ${item.runId} · ${item.status}`,
       `Phase ${item.currentPhase || 'unknown'} · Task ${item.activeTask || 'unknown'}`,
-      `P ${item.completionPercent}% · ${item.health}${item.stale ? ' · stale' : ''}${item.blocker ? ` · blocker ${item.blocker}` : ''}${item.nextAction ? ` · next ${item.nextAction}` : ''}`,
+      `P ${item.completionPercent === undefined ? '—' : `${item.completionPercent}%`} · ${item.health}${item.stale ? ' · stale' : ''}${item.blocker ? ` · blocker ${item.blocker}` : ''}${item.nextAction ? ` · next ${item.nextAction}` : ''}`,
       `Evidence ${item.lastEvidence}`,
       `Exec ${item.executionProfile.engine}/${item.executionProfile.profile}`
     ].join(' | '))
   ].join('\n')
   const narrowText = [
     `Repos ${repositories.length} · Runs ${runProjections.length} · ${health}`,
-    ...repositories.map(item => `${item.repository} · ${item.status} · ${item.completionPercent}%${item.stale ? ' · stale' : ''} · ${item.lastEvidence}`)
+    ...repositories.map(item => `${item.repository} · ${item.status} · ${item.completionPercent === undefined ? '—' : `${item.completionPercent}%`}${item.stale ? ' · stale' : ''} · ${item.lastEvidence}`)
   ].join('\n')
 
   return {
