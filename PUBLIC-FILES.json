@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "sourceCommit": "288b7c35dfca458ddbf5676afa3239608213899b",
+  "sourceCommit": "f7fe92fe52c57d73d8b716b3dbaca5b759669fab",
   "files": [
     {
       "path": ".gitignore",
@@ -40,7 +40,7 @@
     {
       "path": "PUBLIC-SOURCE.json",
       "bytes": 325,
-      "sha256": "d345e3a4dbbda241e0eb1ee425aeff0868013bdfea3a22b7005b22160f9be89c"
+      "sha256": "d3a1bb6ee702c84458deef2bc59ac209a40aa42de8b578e4de74f56fac8e2903"
     },
     {
       "path": "README.md",
@@ -754,8 +754,8 @@
     },
     {
       "path": "docs/CUSTOM_GPT_INSTRUCTIONS.md",
-      "bytes": 8006,
-      "sha256": "262570e81be4b4f5acd244b048071d38d986b8909f051401ec9fbb26a8524273"
+      "bytes": 8010,
+      "sha256": "ff1fedb03fe0d53379add4ec8ad7f0f361c4a5b6d72d4fb78299ee778a9ba435"
     },
     {
       "path": "docs/openapi.chatgpt.json",
@@ -764,8 +764,8 @@
     },
     {
       "path": "docs/openapi.chatgpt/README.md",
-      "bytes": 12238,
-      "sha256": "bbc8d30762db2800c59d0500e884063ac2af9368d84c03e66152676fa424eb60"
+      "bytes": 12182,
+      "sha256": "3ae436c21d3768d1a347698bc3f64aa1490dc0f05abc39b9b1134a3be7b626fa"
     },
     {
       "path": "docs/product/README.md",
@@ -2964,8 +2964,8 @@
     },
     {
       "path": "scripts/verify-custom-gpt-actions.mjs",
-      "bytes": 62955,
-      "sha256": "4c865ea206182568874b8cc12c4dea9c74a57e7540c1166071c5be78714dda48"
+      "bytes": 62958,
+      "sha256": "3b70802cea8488e3ce843d71fc53cfddc9d017cdd4da1f84ee25c41383dec4dd"
     },
     {
       "path": "scripts/verify-dashboard.mjs",

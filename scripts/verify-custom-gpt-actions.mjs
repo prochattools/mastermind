@@ -450,7 +450,7 @@ function ensureFocusedModeGuardrails() {
   assert(safeAccessText.includes('evaluateConnectedRepositoryPath'), 'write policy must use the centralized connected-repository deny policy')
   assert(instructionsText.includes('Activate Workbench'), 'instructions must define natural Workbench activation')
   assert(instructionsText.includes('normalizing common separators'), 'instructions must normalize common repository-name separators')
-  assert(instructionsText.includes('mastermind` matches `Workbench Private'), 'instructions must cover the hyphen/space repository-name variant')
+  assert(instructionsText.includes('legacy hyphenated Workbench Private label'), 'instructions must cover the hyphen/space repository-name variant')
   assert(instructionsText.includes('Never guess between matches'), 'instructions must require explicit disambiguation')
 
   const focusedReadFile = path.join(ROOT, 'packages/cli/src/agent/focused-read.ts')

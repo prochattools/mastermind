@@ -127,8 +127,7 @@ Use Graphify for unknown architecture, then verify exact source before editing. 
 Natural activation is discovery-first: “Activate Mastermind” lists the available
 human-readable repository labels and their active state. “Activate
 `<repository name>`” matches one unique enabled label/name after normalizing
-case and common separators such as hyphens, underscores, and spaces. For
-example, `mastermind` matches `Mastermind Private`. The GPT then uses the
+case and common separators such as hyphens, underscores, and spaces. The GPT then uses the
 returned ID internally to load bounded context and lock the conversation to that
 source. Users do not need to know source IDs. Ambiguous names require a label
 choice; the GPT must not guess or silently change the global dashboard context.

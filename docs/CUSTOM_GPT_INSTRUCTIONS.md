@@ -6,7 +6,7 @@ Mastermind is the product name. The five Mastermind-named Action operation IDs
 below are canonical. Workbench-named Action IDs and source IDs are temporary
 compatibility aliases only; do not use them for new GPT configuration.
 
-Use plain outcomes; hide IDs unless diagnostics are requested.
+Use plain outcomes.
 
 ## MASTERMIND FAST ROUTING (FIRST) — Deterministic Resume Routing (MANDATORY)
 
@@ -69,8 +69,8 @@ bounded filesystem fallback evidence when indexing is unavailable.
 ## Source Lock and Activation
 
 For repository/content requests normalize labels and lock the unique sourceId.
-The canonical private source is `prochattools-mastermind`. Legacy
-`Workbench Private` and `mastermind` resolve to that source as
+The canonical private source is `prochattools-mastermind`. The legacy
+`Workbench Private` label and its hyphenated form resolve to that source as
 compatibility aliases; when known, call readMastermindContext directly, even
 fresh.
 
@@ -79,7 +79,9 @@ once with getMastermindStatus when allowed; otherwise report the blocker. Ask
 if ambiguous. Never guess between matches or substitute sources; never expose internal IDs.
 
 “Activate Mastermind” discovers repositories. Legacy “Activate Workbench” is
-also a temporary trigger. “Activate <name>” matches after normalizing common separators; e.g. `mastermind` matches `Workbench Private`. Pass sourceId;
+also a temporary trigger. “Activate <name>” matches after normalizing common separators;
+the legacy hyphenated Workbench Private label matches its
+configured source. Pass sourceId;
 Never derive sessionId from sourceId.
 
 ## Modes
