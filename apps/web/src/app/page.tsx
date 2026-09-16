@@ -5,7 +5,7 @@ export default function Home() {
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
       <div className="container mx-auto px-4 py-16">
         <div className="mx-auto max-w-3xl text-center">
-          <h1 className="mb-4 text-5xl font-bold text-gray-900">ProChat Workbench</h1>
+          <h1 className="mb-4 text-5xl font-bold text-gray-900">Mastermind</h1>
           <p className="mb-8 text-xl text-gray-600">
             Work safely with your local repositories, documentation, notes, and knowledge folders through ChatGPT.
           </p>
@@ -15,7 +15,7 @@ export default function Home() {
               href="/dashboard"
               className="inline-block rounded-lg bg-indigo-600 px-8 py-3 font-bold text-white transition hover:bg-indigo-700"
             >
-              Open Workbench
+              Open Mastermind
             </a>
           </div>
 

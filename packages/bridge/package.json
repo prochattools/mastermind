@@ -1,16 +1,16 @@
 {
-  "name": "@workbench/bridge",
+  "name": "@mastermind/bridge",
   "version": "0.1.0",
   "private": true,
   "license": "AGPL-3.0-only",
-  "description": "BuildFlow relay server",
+  "description": "Mastermind relay server",
   "main": "dist/server.js",
   "scripts": {
     "build": "tsc",
     "start": "node dist/server.js"
   },
   "dependencies": {
-    "@workbench/shared": "workspace:*",
+    "@mastermind/shared": "workspace:*",
     "ws": "^8.21.0"
   },
   "devDependencies": {

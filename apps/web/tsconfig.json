@@ -8,19 +8,19 @@
       "@/*": [
         "./src/*"
       ],
-      "@workbench/shared": [
+      "@mastermind/shared": [
         "../../packages/shared/src/index.ts"
       ],
-      "@workbench/shared/*": [
+      "@mastermind/shared/*": [
         "../../packages/shared/src/*"
       ],
-      "@workbench/cli/telemetry-store": [
+      "@mastermind/cli/telemetry-store": [
         "../../packages/cli/src/agent/telemetry-store.ts"
       ],
-      "@workbench/cli/slo-health": [
+      "@mastermind/cli/slo-health": [
         "../../packages/cli/src/agent/slo-health.ts"
       ],
-      "@workbench/bridge/request-audit": [
+      "@mastermind/bridge/request-audit": [
         "../../packages/bridge/src/storage/request-audit.ts"
       ]
     },

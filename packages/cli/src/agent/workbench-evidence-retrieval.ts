@@ -8,7 +8,7 @@ import {
   type WorkbenchEvidenceReadOwner,
   type WorkbenchEvidenceRecord,
   workbenchEvidenceIdSchema
-} from '@workbench/shared'
+} from '@mastermind/shared'
 import {
   readWorkbenchEvidence,
   type WorkbenchEvidenceStoreFailure,

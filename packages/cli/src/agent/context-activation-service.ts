@@ -1,5 +1,5 @@
 import fs from 'node:fs'
-import type { KnowledgeSource } from '@workbench/shared'
+import type { KnowledgeSource } from '@mastermind/shared'
 import { getSourcesSafe } from './config'
 import {
   confirmContextProposalForActivation,

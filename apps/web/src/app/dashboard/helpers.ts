@@ -1,4 +1,4 @@
-import type { KnowledgeSource, ActiveSourcesMode, WriteMode } from '@workbench/shared'
+import type { KnowledgeSource, ActiveSourcesMode, WriteMode } from '@mastermind/shared'
 
 export function getAgentHealthLabel(agentConnected: boolean): string {
   return agentConnected ? 'Agent connected' : 'Agent disconnected'

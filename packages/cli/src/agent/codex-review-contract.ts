@@ -5,7 +5,7 @@ import {
   canonicalizeAutonomyValue,
   evaluateConnectedRepositoryPath,
   type AutonomyDecisionRequest
-} from '@workbench/shared'
+} from '@mastermind/shared'
 import { prepareAutonomyDecisionAuthorization } from './autonomy-decision-authorization'
 import {
   ensurePendingApprovalIntent,

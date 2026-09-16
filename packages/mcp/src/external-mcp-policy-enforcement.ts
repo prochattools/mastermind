@@ -18,7 +18,7 @@ import {
 } from './external-mcp-intake.js'
 import type { CapabilityPermission } from './capability-resolution.js'
 import type { CapabilityBudget } from './capability-planning.js'
-import type { CapabilityJsonSchema, CapabilityManifest, CapabilityNetworkMethod } from '@workbench/shared'
+import type { CapabilityJsonSchema, CapabilityManifest, CapabilityNetworkMethod } from '@mastermind/shared'
 
 export const EXTERNAL_MCP_POLICY_ENFORCEMENT_VERSION = 'r22.5' as const
 export const EXTERNAL_MCP_POLICY_ENFORCEMENT_SOURCE = 'workbench-owned-r22.5' as const

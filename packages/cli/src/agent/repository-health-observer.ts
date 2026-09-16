@@ -1,7 +1,7 @@
 import { execFileSync } from 'node:child_process'
 import fs from 'node:fs'
 import path from 'node:path'
-import type { KnowledgeSource } from '@workbench/shared'
+import type { KnowledgeSource } from '@mastermind/shared'
 import { getSourcesSafe } from './config'
 import { getIndexRecord, type SourceIndexRecord } from './index-state'
 import {

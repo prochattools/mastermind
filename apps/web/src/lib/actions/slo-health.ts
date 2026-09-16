@@ -1,9 +1,9 @@
-import { appendTelemetrySample, loadTelemetryStore } from '@workbench/cli/telemetry-store'
+import { appendTelemetrySample, loadTelemetryStore } from '@mastermind/cli/telemetry-store'
 import {
   evaluateSloHealth,
   type SloHealthResult,
   type SloThresholdConfig
-} from '@workbench/cli/slo-health'
+} from '@mastermind/cli/slo-health'
 
 export type CompactSloHealth = {
   health: SloHealthResult['health']

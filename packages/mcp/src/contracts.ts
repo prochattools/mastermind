@@ -5,7 +5,7 @@ import {
   sessionAwareRunWorkbenchCommandRequestSchema,
   type PersistedValidationCommandKind,
   type RunWorkbenchDirectCommandKind
-} from '@workbench/shared'
+} from '@mastermind/shared'
 import { zodToJsonSchema } from 'zod-to-json-schema'
 
 export const WORKBENCH_TOOL_NAMES = [

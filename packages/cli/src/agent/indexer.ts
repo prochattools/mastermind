@@ -4,7 +4,7 @@ import path from 'path'
 import matter from 'gray-matter'
 import { getEnabledSources } from './config'
 import { getConfigDir, getIndexPath, getIndexDir, getSourceIndexPath } from '../utils/paths'
-import { IndexedDoc } from '@workbench/shared'
+import { IndexedDoc } from '@mastermind/shared'
 import { recordIndexTelemetry } from './index-graph-telemetry'
 import {
   DEFAULT_IGNORE_PATTERNS,

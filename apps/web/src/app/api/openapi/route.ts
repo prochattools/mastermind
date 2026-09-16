@@ -1,9 +1,9 @@
 import { NextResponse } from 'next/server'
 
 import canonicalOpenApiSchema from '../../../lib/openapi-chatgpt.json'
-const PUBLIC_ACTION_ORIGIN = 'https://workbench.prochat.tools'
+const PUBLIC_ACTION_ORIGIN = 'https://mastermind.prochat.tools'
 
-const createWorkbenchSchema = () => {
+const createMastermindSchema = () => {
   const schema = structuredClone(canonicalOpenApiSchema) as Record<string, unknown>
   schema.servers = [{ url: PUBLIC_ACTION_ORIGIN }]
   const components = schema.components && typeof schema.components === 'object' && !Array.isArray(schema.components)
@@ -15,7 +15,7 @@ const createWorkbenchSchema = () => {
 }
 
 export async function GET() {
-  const schema = createWorkbenchSchema()
+  const schema = createMastermindSchema()
 
   return NextResponse.json(schema, {
     headers: { 'Cache-Control': 'public, max-age=60' }

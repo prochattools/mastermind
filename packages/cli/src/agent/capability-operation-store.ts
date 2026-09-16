@@ -11,7 +11,7 @@ import {
   type ControlledWorkflowMigrationEvidence,
   type ControlledWorkflowMigrationOperation,
   type ControlledWorkflowMigrationReasonCode
-} from '@workbench/shared'
+} from '@mastermind/shared'
 
 export const CAPABILITY_OPERATION_STORE_VERSION = 1 as const
 

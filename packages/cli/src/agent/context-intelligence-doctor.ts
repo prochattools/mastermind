@@ -1,7 +1,7 @@
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
-import type { KnowledgeSource, ActiveSourcesMode } from '@workbench/shared'
+import type { KnowledgeSource, ActiveSourcesMode } from '@mastermind/shared'
 import { getActiveSourceContext } from './config'
 import { listContextProposals, listContextSessions, type ContextIntelligenceStoreOptions } from './context-intelligence-store'
 import type { ContextBudget, ContextProposal, ContextSession, RepositoryHealth } from './context-intelligence-models'

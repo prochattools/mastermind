@@ -1,4 +1,4 @@
-import type { KnowledgeSource, ActiveSourcesMode, WriteMode } from '@workbench/shared'
+import type { KnowledgeSource, ActiveSourcesMode, WriteMode } from '@mastermind/shared'
 
 import type { DashboardActivityEvent, DashboardLocalPlan } from './types'
 
@@ -120,7 +120,7 @@ export function buildCodexHandoffPrompt(context: HandoffPromptContext) {
   const activeSourceSummary = context.activeSourceIds.length > 0 ? context.activeSourceIds.join(', ') : 'none'
 
   return [
-    'You are working in the public BuildFlow Local repo.',
+    'You are working in the public Mastermind repo.',
     `Current section: ${context.currentSection || 'Handoff'}.`,
     `Workspace status: ${context.agentConnected ? 'agent connected' : 'agent disconnected'}.`,
     selectedSource,
@@ -150,7 +150,7 @@ export function buildClaudeHandoffPrompt(context: HandoffPromptContext) {
   const activeSourceSummary = context.activeSourceIds.length > 0 ? context.activeSourceIds.join(', ') : 'none'
 
   return [
-    'Work in the local BuildFlow repo.',
+    'Work in the local Mastermind repo.',
     'Use the existing dashboard design system and keep the current reliability behavior intact.',
     `Current section: ${context.currentSection || 'Handoff'}.`,
     `Agent: ${context.agentConnected ? 'connected' : 'disconnected'}.`,

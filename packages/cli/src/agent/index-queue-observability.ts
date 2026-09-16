@@ -5,7 +5,7 @@ import { getConfigDir } from '../utils/paths'
 import type { IndexJob, RepositoryHealth } from './context-intelligence-models'
 import { listIndexJobs, type IndexLifecycleStoreOptions } from './index-lifecycle-store'
 import { observeRepositoryHealth, type RepositoryHealthObserverOptions } from './repository-health-observer'
-import type { KnowledgeSource } from '@workbench/shared'
+import type { KnowledgeSource } from '@mastermind/shared'
 
 export type QueueHistoryEventType = 'enqueued' | 'claimed' | 'started' | 'completed' | 'failed' | 'retry_scheduled' | 'cancelled' | 'recovered' | 'terminal_failure' | 'rejected' | 'saturated'
 export type QueueHistoryEvent = { eventId: string; eventType: QueueHistoryEventType; jobId: string; sourceId: string; occurredAt: string; owner?: string; leaseId?: string; attempt?: number; reason?: string; failureCode?: string; details?: string }

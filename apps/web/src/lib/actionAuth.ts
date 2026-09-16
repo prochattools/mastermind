@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import crypto from 'node:crypto'
-import { verifyWorkbenchMcpCredential } from '@workbench/shared/workbench-mcp-auth'
-import { logRequest } from '@workbench/bridge/request-audit'
+import { verifyWorkbenchMcpCredential } from '@mastermind/shared/workbench-mcp-auth'
+import { logRequest } from '@mastermind/bridge/request-audit'
 import { getActionToken, getBackendMode } from './actions/config'
 
 export interface AuthResult {
@@ -48,7 +48,7 @@ export function checkActionAuth(request: NextRequest): AuthResult {
   if (mode === 'relay-agent' && isMcpCredential) {
     return {
       valid: false,
-      error: NextResponse.json({ error: 'Workbench MCP is unavailable in relay-agent mode' }, { status: 403 })
+      error: NextResponse.json({ error: 'Mastermind MCP is unavailable in relay-agent mode' }, { status: 403 })
     }
   }
 
@@ -88,13 +88,13 @@ export function checkActionAuth(request: NextRequest): AuthResult {
     if (!WORKBENCH_MCP_ACTION_ROUTES.has(routeIdentity)) {
       return {
         valid: false,
-        error: NextResponse.json({ error: 'Workbench MCP action is not admitted' }, { status: 403 })
+        error: NextResponse.json({ error: 'Mastermind MCP action is not admitted' }, { status: 403 })
       }
     }
     if (!auditMcpRequest(request)) {
       return {
         valid: false,
-        error: NextResponse.json({ error: 'Workbench action audit unavailable' }, { status: 503 })
+        error: NextResponse.json({ error: 'Mastermind action audit unavailable' }, { status: 503 })
       }
     }
     return { valid: true, principal: 'codex-workbench-mcp' }

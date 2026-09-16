@@ -3,7 +3,7 @@ import {
   appendTelemetrySample,
   loadTelemetryStore,
   redactTelemetryTag
-} from '@workbench/cli/telemetry-store'
+} from '@mastermind/cli/telemetry-store'
 
 export type RunCommandTelemetryDisposition = 'success' | 'failure' | 'timed_out' | 'rejected'
 

@@ -4,7 +4,7 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 WEB_DIR="$ROOT_DIR/apps/web"
 COMPOSE_FILE="$ROOT_DIR/docker-compose.yml"
-PROJECT_NAME="workbench"
+PROJECT_NAME="mastermind"
 SERVICE_MANAGER="$ROOT_DIR/scripts/workbench-detached-service.mjs"
 
 HOST="127.0.0.1"
@@ -13,7 +13,7 @@ RELAY_PORT="${RELAY_PORT:-3053}"
 WEB_PORT="${WEB_PORT:-3054}"
 
 OWNER_HOME="$(node -p "require('node:os').userInfo().homedir")"
-RUN_DIR="$OWNER_HOME/.config/workbench/runtime-state"
+RUN_DIR="$OWNER_HOME/.config/mastermind/runtime-state"
 AGENT_LOG="$RUN_DIR/agent.log"
 AGENT_ERR="$RUN_DIR/agent.err.log"
 WEB_LOG="$RUN_DIR/web.log"
@@ -31,14 +31,18 @@ initialize_build_identity() {
   build_timestamp="$(date -u '+%Y-%m-%dT%H:%M:%SZ')"
 
   if ! printf '%s' "$git_sha" | grep -Eq '^[0-9a-f]{40}$'; then
-    log "ERROR: could not establish exact Workbench Git revision"
+    log "ERROR: could not establish exact Mastermind Git revision"
     return 1
   fi
   if [ -z "$package_version" ]; then
-    log "ERROR: could not establish Workbench package version"
+    log "ERROR: could not establish Mastermind package version"
     return 1
   fi
 
+  export MASTERMIND_PACKAGE_VERSION="$package_version"
+  export MASTERMIND_BUILD_SHA="$git_sha"
+  export MASTERMIND_BUILD_TIMESTAMP="$build_timestamp"
+  # Keep legacy names available to older child processes during the migration.
   export WORKBENCH_PACKAGE_VERSION="$package_version"
   export WORKBENCH_BUILD_SHA="$git_sha"
   export WORKBENCH_BUILD_TIMESTAMP="$build_timestamp"
@@ -96,7 +100,7 @@ stop_relay() {
   containers="$(docker ps -aq --filter "label=com.docker.compose.project=$PROJECT_NAME" || true)"
 
   if [ -n "$containers" ]; then
-    log "Removing leftover Workbench compose containers"
+  log "Removing leftover Mastermind compose containers"
     docker rm -f $containers >/dev/null
   fi
 
@@ -104,7 +108,7 @@ stop_relay() {
 }
 
 stop_stack() {
-  log "Stopping Workbench host services only"
+  log "Stopping Mastermind host services only"
 
   node "$SERVICE_MANAGER" stop web --port "$WEB_PORT"
   node "$SERVICE_MANAGER" stop agent --port "$AGENT_PORT"
@@ -125,22 +129,22 @@ build_runtime_packages() {
 }
 
 preflight_action_auth() {
-  log "Validating owner-local Workbench action authentication"
+  log "Validating owner-local Mastermind action authentication"
   pnpm --dir "$ROOT_DIR/packages/shared" build
   if ! node "$SERVICE_MANAGER" validate-auth; then
-    log "ERROR: owner-local Workbench action authentication is unavailable"
+    log "ERROR: owner-local Mastermind action authentication is unavailable"
     return 1
   fi
-  log "✓ owner-local Workbench action authentication validated"
+  log "✓ owner-local Mastermind action authentication validated"
 }
 
 preflight_transport_config() {
-  log "Validating owner-local Workbench transport configuration"
+  log "Validating owner-local Mastermind transport configuration"
   if ! node "$SERVICE_MANAGER" validate-transport; then
-    log "ERROR: owner-local Workbench transport configuration is unavailable or invalid"
+    log "ERROR: owner-local Mastermind transport configuration is unavailable or invalid"
     return 1
   fi
-  log "✓ owner-local Workbench transport configuration validated"
+  log "✓ owner-local Mastermind transport configuration validated"
 }
 
 start_relay() {

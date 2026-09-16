@@ -37,7 +37,7 @@ async function testTransportTimeoutReturnsHttp200() {
     200,
     buildActionErrorEnvelope({
       code: 'LOCAL_STACK_TIMEOUT',
-      message: 'Workbench local stack timed out.',
+      message: 'Mastermind local stack timed out.',
       details: 'Request exceeded timeout.',
       status: 'timeout'
     })
@@ -103,7 +103,7 @@ async function testDeadlineHandlesTransportErrors() {
         200,
         buildActionErrorEnvelope({
           code: 'LOCAL_STACK_UNAVAILABLE',
-          message: 'Workbench local stack is unavailable.',
+          message: 'Mastermind local stack is unavailable.',
           details: 'Connection refused.',
           status: 'unavailable'
         })

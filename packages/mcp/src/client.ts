@@ -2,13 +2,13 @@ import fs from 'node:fs'
 import http from 'node:http'
 import os from 'node:os'
 import path from 'node:path'
-import { verifyWorkbenchMcpCredential } from '@workbench/shared/workbench-mcp-auth'
-import { loadWorkbenchOwnerConfig } from '@workbench/shared/workbench-owner-config'
-import { loadWorkbenchTransportConfig, type WorkbenchTransport } from '@workbench/shared/workbench-transport-config'
+import { verifyWorkbenchMcpCredential } from '@mastermind/shared/workbench-mcp-auth'
+import { loadWorkbenchOwnerConfig } from '@mastermind/shared/workbench-owner-config'
+import { loadWorkbenchTransportConfig, type WorkbenchTransport } from '@mastermind/shared/workbench-transport-config'
 import type { WorkbenchToolContract } from './contracts.js'
 
-export const WORKBENCH_MCP_CREDENTIAL_FILE = path.join(os.homedir(), '.buildflow', 'codex-workbench-mcp.token')
-export const WORKBENCH_ACTION_BASE_URL = process.env.WORKBENCH_ACTION_BASE_URL || 'http://127.0.0.1:3154'
+export const WORKBENCH_MCP_CREDENTIAL_FILE = path.join(os.homedir(), '.mastermind', 'codex-mastermind-mcp.token')
+export const WORKBENCH_ACTION_BASE_URL = process.env.MASTERMIND_ACTION_BASE_URL || process.env.WORKBENCH_ACTION_BASE_URL || 'http://127.0.0.1:3154'
 export const MAX_ACTION_REQUEST_BYTES = 64 * 1024
 export const MAX_ACTION_RESPONSE_BYTES = 64 * 1024
 export const CONNECTION_TIMEOUT_MS = 2_000

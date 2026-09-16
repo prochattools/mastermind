@@ -15,7 +15,7 @@ import {
   type WorkbenchEvidenceRecord,
   type WorkbenchEvidenceRetentionClass,
   type WorkbenchEvidenceOwner
-} from '@workbench/shared'
+} from '@mastermind/shared'
 import { getConfigDir } from '../utils/paths'
 import { redactSecrets } from './safe-access'
 import { getWorkbenchSession, type WorkbenchSessionStoreOptions } from './workbench-session-store'

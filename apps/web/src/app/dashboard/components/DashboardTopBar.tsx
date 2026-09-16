@@ -31,7 +31,7 @@ export function DashboardTopBar({
       <div className="flex h-11 items-center justify-between gap-3 px-4 lg:px-5">
         <div className="min-w-0">
           <div className="flex items-center gap-1.5 text-[11px] font-medium text-bf-muted dark:text-slate-400">
-            <span className="text-bf-text dark:text-slate-200">BuildFlow</span>
+            <span className="text-bf-text dark:text-slate-200">Mastermind</span>
             <span>·</span>
             <span>{currentSectionLabel}</span>
           </div>

@@ -1,6 +1,6 @@
 import * as path from 'node:path'
 import { z } from 'zod'
-import { controlledWorkflowCanonicalizationVersionSchema } from '@workbench/shared'
+import { controlledWorkflowCanonicalizationVersionSchema } from '@mastermind/shared'
 
 const sha256Schema = z.string().regex(/^[a-f0-9]{64}$/)
 const sourceIdSchema = z.string().trim().min(1).max(160)

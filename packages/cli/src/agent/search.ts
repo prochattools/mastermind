@@ -1,6 +1,6 @@
 import Fuse from 'fuse.js'
 import type { FuseResult } from 'fuse.js'
-import { IndexedDoc, SearchResult } from '@workbench/shared'
+import { IndexedDoc, SearchResult } from '@mastermind/shared'
 
 type SearchMode = 'path' | 'content'
 

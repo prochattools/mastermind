@@ -36,7 +36,7 @@ export default function ReferenceReadinessCard() {
             Local readiness at a glance
           </h2>
           <p className="mt-2 max-w-2xl text-gray-600">
-            A compact view of the safe workflow behind every Workbench change.
+            A compact view of the safe workflow behind every Mastermind change.
           </p>
         </div>
         <span className="inline-flex w-fit items-center rounded-full bg-emerald-100 px-3 py-1 text-sm font-semibold text-emerald-700">

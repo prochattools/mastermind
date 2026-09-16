@@ -3,7 +3,7 @@ import path from 'path'
 import { readdirSync, statSync } from 'fs'
 import { getWorkspace } from './config'
 import { logToFile } from '../utils/logger'
-import type { Workspace, TreeNode } from '@workbench/shared'
+import type { Workspace, TreeNode } from '@mastermind/shared'
 
 export function resolveWorkspacePath(workspace: Workspace, relativePath: string = ''): string {
   const normalized = path.normalize(relativePath)

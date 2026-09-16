@@ -1,5 +1,5 @@
 import type { FormEvent, RefObject } from 'react'
-import type { KnowledgeSource, DiscoveredRepository } from '@workbench/shared'
+import type { KnowledgeSource, DiscoveredRepository } from '@mastermind/shared'
 import { Folder, MoreHorizontal } from 'lucide-react'
 
 import { DashboardButton } from './ui/DashboardButton'
@@ -181,7 +181,7 @@ export function KnowledgeSourcesPanel({
                 </div>
               </form>
               {discoveryError ? <p className="mt-2 text-[12px] text-red-600 dark:text-red-300">{discoveryError}</p> : null}
-              <p className="mt-2 text-[12px] text-bf-muted dark:text-slate-400">BuildFlow scans recursively for Git repos, groups them by account folder, and auto-generates label and source ID.</p>
+              <p className="mt-2 text-[12px] text-bf-muted dark:text-slate-400">Mastermind scans recursively for Git repos, groups them by account folder, and auto-generates a label and source ID.</p>
             </DashboardPanel>
           ) : null}
 

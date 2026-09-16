@@ -126,8 +126,7 @@ function emitDeprecationWarning(legacyVar: string, canonicalVar: string): void {
  * Validates that invalid modes fail rather than silently falling back.
  */
 export function getBackendMode(): 'direct-agent' | 'relay-agent' {
-  const result = resolveEnvVar('WORKBENCH_BACKEND_MODE', 'BUILDFLOW_BACKEND_MODE', 'direct-agent')
-  const mode = result.value as 'direct-agent' | 'relay-agent' | undefined
+  const mode = resolveMastermindEnvValue('MASTERMIND_BACKEND_MODE', 'WORKBENCH_BACKEND_MODE', 'BUILDFLOW_BACKEND_MODE', 'direct-agent') as 'direct-agent' | 'relay-agent' | undefined
 
   if (mode && !['direct-agent', 'relay-agent'].includes(mode)) {
     throw new Error(`Invalid backend mode: "${mode}". Must be one of: direct-agent, relay-agent.`)
@@ -141,7 +140,7 @@ export function getBackendMode(): 'direct-agent' | 'relay-agent' {
  * Secret: never expose the value in logs or errors.
  */
 export function getActionToken(): string | null {
-  return resolveEnvVariable('WORKBENCH_ACTION_TOKEN', 'BUILDFLOW_ACTION_TOKEN', undefined, true) ?? null
+  return resolveMastermindEnvValue('MASTERMIND_ACTION_TOKEN', 'WORKBENCH_ACTION_TOKEN', 'BUILDFLOW_ACTION_TOKEN', undefined) ?? null
 }
 
 /**
@@ -149,8 +148,7 @@ export function getActionToken(): string | null {
  * Validates that invalid modes fail rather than silently falling back.
  */
 export function getWebServerMode(): 'production' | 'start' | 'dev' {
-  const result = resolveEnvVar('WORKBENCH_WEB_SERVER_MODE', 'BUILDFLOW_WEB_SERVER_MODE', 'production')
-  const mode = result.value as 'production' | 'start' | 'dev' | undefined
+  const mode = resolveMastermindEnvValue('MASTERMIND_WEB_SERVER_MODE', 'WORKBENCH_WEB_SERVER_MODE', 'BUILDFLOW_WEB_SERVER_MODE', 'production') as 'production' | 'start' | 'dev' | undefined
 
   if (mode && !['production', 'start', 'dev'].includes(mode)) {
     throw new Error(`Invalid web server mode: "${mode}". Must be one of: production, start, dev.`)
@@ -164,8 +162,7 @@ export function getWebServerMode(): 'production' | 'start' | 'dev' {
  * Validates that invalid modes fail rather than silently falling back.
  */
 export function getAgentServerMode(): 'production' | 'dev' {
-  const result = resolveEnvVar('WORKBENCH_AGENT_SERVER_MODE', 'BUILDFLOW_AGENT_SERVER_MODE', 'dev')
-  const mode = result.value as 'production' | 'dev' | undefined
+  const mode = resolveMastermindEnvValue('MASTERMIND_AGENT_SERVER_MODE', 'WORKBENCH_AGENT_SERVER_MODE', 'BUILDFLOW_AGENT_SERVER_MODE', 'dev') as 'production' | 'dev' | undefined
 
   if (mode && !['production', 'dev'].includes(mode)) {
     throw new Error(`Invalid agent server mode: "${mode}". Must be one of: production, dev.`)
@@ -179,7 +176,7 @@ export function getAgentServerMode(): 'production' | 'dev' {
  * Metadata: safe to log (non-secret).
  */
 export function getBuildSha(): string {
-  const value = resolveEnvVariable('WORKBENCH_BUILD_SHA', 'BUILDFLOW_BUILD_SHA', 'unknown')
+  const value = resolveMastermindEnvValue('MASTERMIND_BUILD_SHA', 'WORKBENCH_BUILD_SHA', 'BUILDFLOW_BUILD_SHA', 'unknown')
   return value || 'unknown'
 }
 
@@ -188,7 +185,7 @@ export function getBuildSha(): string {
  * Metadata: safe to log (non-secret).
  */
 export function getBuildTimestamp(): string {
-  const value = resolveEnvVariable('WORKBENCH_BUILD_TIMESTAMP', 'BUILDFLOW_BUILD_TIMESTAMP', 'unknown')
+  const value = resolveMastermindEnvValue('MASTERMIND_BUILD_TIMESTAMP', 'WORKBENCH_BUILD_TIMESTAMP', 'BUILDFLOW_BUILD_TIMESTAMP', 'unknown')
   return value || 'unknown'
 }
 
@@ -196,7 +193,7 @@ export function getBuildTimestamp(): string {
  * Resolve action diagnostics flag — delegates to shared module resolver.
  */
 export function getActionDiagnostics(): boolean {
-  const value = resolveEnvVariable('WORKBENCH_ACTION_DIAGNOSTICS', 'BUILDFLOW_ACTION_DIAGNOSTICS', '0')
+  const value = resolveMastermindEnvValue('MASTERMIND_ACTION_DIAGNOSTICS', 'WORKBENCH_ACTION_DIAGNOSTICS', 'BUILDFLOW_ACTION_DIAGNOSTICS', '0')
   return value === '1'
 }
 
@@ -204,6 +201,21 @@ export function getActionDiagnostics(): boolean {
  * Resolve API base URL — delegates to shared module resolver.
  */
 export function getApiBaseUrl(): string {
-  const value = resolveEnvVariable('WORKBENCH_API', 'BUILDFLOW_API', 'http://localhost:3000')
+  const value = resolveMastermindEnvValue('MASTERMIND_API', 'WORKBENCH_API', 'BUILDFLOW_API', 'http://localhost:3000')
   return value || 'http://localhost:3000'
+}
+
+function resolveMastermindEnvValue(
+  mastermind: string,
+  workbench: string,
+  buildflow: string | undefined,
+  defaultValue?: string
+): string | undefined {
+  const mastermindValue = process.env[mastermind]
+  const workbenchValue = process.env[workbench]
+  const buildflowValue = buildflow ? process.env[buildflow] : undefined
+  if (!mastermindValue && workbenchValue && buildflowValue && workbenchValue !== buildflowValue) {
+    throw new Error(`Conflicting environment variables: ${workbench} and ${buildflow} are both set with different values. Remove the legacy ${buildflow}.`)
+  }
+  return mastermindValue || workbenchValue || buildflowValue || defaultValue
 }

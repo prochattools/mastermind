@@ -1,4 +1,4 @@
-import type { KnowledgeSource } from '@workbench/shared'
+import type { KnowledgeSource } from '@mastermind/shared'
 import { CalendarDays, CheckCircle2, Clock3, ListTodo } from 'lucide-react'
 
 import type { DashboardLocalPlan, DashboardPlanTaskStatus } from '../types'

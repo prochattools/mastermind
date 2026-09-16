@@ -1,12 +1,12 @@
-# ChatGPT-first ProChat Workbench Workflow
+# ChatGPT-first ProChat Mastermind Workflow
 
-ProChat Workbench should stay ChatGPT-first.
+ProChat Mastermind should stay ChatGPT-first.
 
-The self-hosted Local product should keep the BuildFlow engine, source indexer, safety policy, verified writes, and fallback dashboard. The main user experience should stay in ChatGPT through Custom GPT actions, structured action responses, handoff links, and later optional embedded app surfaces outside the public Local repo.
+The self-hosted Local product should keep the existing Workbench/BuildFlow compatibility engine, source indexer, safety policy, verified writes, and fallback dashboard. The main user experience should stay in ChatGPT through Custom GPT actions, structured action responses, handoff links, and later optional embedded app surfaces outside the public Local repo.
 
 ## Current state
 
-Workbench Local already provides:
+Mastermind Local already provides:
 
 - user-owned Custom GPT action schema
 - local agent and dashboard
@@ -54,7 +54,7 @@ The goal is:
 
 ```text
 ChatGPT = primary interface for planning, approval, progress, and results
-Workbench Local = local repo connector, safety engine, indexer, logs, and fallback dashboard
+Mastermind Local = local repo connector, safety engine, indexer, logs, and fallback dashboard
 ```
 
 ## What belongs in self-hosted Workbench Local

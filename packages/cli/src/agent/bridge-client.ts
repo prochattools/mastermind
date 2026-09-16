@@ -1,5 +1,5 @@
 import WebSocket from 'ws'
-import { ToolCallMessage, ToolResponseMessage } from '@workbench/shared'
+import { ToolCallMessage, ToolResponseMessage } from '@mastermind/shared'
 import { readFile, createFile, appendFile } from './vault'
 import { Indexer } from './indexer'
 import { VaultSearcher } from './search'

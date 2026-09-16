@@ -10,7 +10,7 @@ import {
   type ValidationSelectionNode,
   type ValidationSelectionSkipped,
   type ValidationSelectionV1
-} from '@workbench/shared'
+} from '@mastermind/shared'
 
 type ValidationDeclaration = {
   commandKind?: unknown

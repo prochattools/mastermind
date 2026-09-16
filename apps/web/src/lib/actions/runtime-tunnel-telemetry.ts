@@ -2,7 +2,7 @@ import {
   appendTelemetryEvent,
   appendTelemetrySample,
   type TelemetryDimensions
-} from '@workbench/cli/telemetry-store'
+} from '@mastermind/cli/telemetry-store'
 
 export type RuntimeHealth = 'healthy' | 'degraded' | 'overloaded' | 'unknown'
 

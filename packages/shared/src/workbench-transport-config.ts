@@ -4,7 +4,8 @@ import path from 'node:path'
 import { TextDecoder } from 'node:util'
 
 const MAX_TRANSPORT_CONFIG_BYTES = 4 * 1024
-const TRANSPORT_KEY = 'WORKBENCH_TRANSPORT'
+const TRANSPORT_KEY = 'MASTERMIND_TRANSPORT'
+const LEGACY_TRANSPORT_KEY = 'WORKBENCH_TRANSPORT'
 const TRANSPORT_VALUES = new Set(['typescript_agent', 'native_helper'])
 
 export type WorkbenchTransport = 'typescript_agent' | 'native_helper'
@@ -53,7 +54,7 @@ function parseTransport(text: string | undefined): WorkbenchTransport {
   for (const raw of text.split(/\r?\n/)) {
     const line = raw.trim()
     if (!line || line.startsWith('#')) continue
-    const match = line.match(/^WORKBENCH_TRANSPORT=(typescript_agent|native_helper)$/)
+    const match = line.match(/^(?:MASTERMIND_TRANSPORT|WORKBENCH_TRANSPORT)=(typescript_agent|native_helper)$/)
     if (!match || value !== undefined) fail('CONFIG_INVALID')
     value = match[1] as WorkbenchTransport
   }
@@ -62,7 +63,9 @@ function parseTransport(text: string | undefined): WorkbenchTransport {
 
 export function resolveWorkbenchTransportConfigPath(homeDir = os.userInfo().homedir): string {
   if (!path.isAbsolute(homeDir)) fail('CONFIG_UNSAFE')
-  return path.join(homeDir, '.config', 'workbench', 'transport.env')
+  const canonical = path.join(homeDir, '.config', 'mastermind', 'transport.env')
+  const legacy = path.join(homeDir, '.config', 'workbench', 'transport.env')
+  return fs.existsSync(canonical) || !fs.existsSync(legacy) ? canonical : legacy
 }
 
 export function loadWorkbenchTransportConfig(options: { homeDir?: string; expectedUid?: number } = {}): WorkbenchTransportConfig {
@@ -82,7 +85,7 @@ export function writeWorkbenchTransportConfig(transport: WorkbenchTransport, opt
   readFileStrict(configPath, options.expectedUid)
   const temporary = `${configPath}.${process.pid}.${Date.now()}.tmp`
   try {
-    fs.writeFileSync(temporary, `${TRANSPORT_KEY}=${transport}\n`, { encoding: 'utf8', mode: 0o600 })
+    fs.writeFileSync(temporary, `${TRANSPORT_KEY}=${transport}\n${LEGACY_TRANSPORT_KEY}=${transport}\n`, { encoding: 'utf8', mode: 0o600 })
     fs.chmodSync(temporary, 0o600)
     fs.renameSync(temporary, configPath)
     fs.chmodSync(configPath, 0o600)

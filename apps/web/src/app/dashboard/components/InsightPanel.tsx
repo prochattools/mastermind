@@ -1,4 +1,4 @@
-import type { ActiveSourcesMode, KnowledgeSource, WriteMode } from '@workbench/shared'
+import type { ActiveSourcesMode, KnowledgeSource, WriteMode } from '@mastermind/shared'
 
 import { DashboardButton } from './ui/DashboardButton'
 import { DashboardCodeText } from './ui/DashboardCodeText'

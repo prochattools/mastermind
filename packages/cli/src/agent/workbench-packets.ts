@@ -2,7 +2,7 @@ import { execFileSync } from 'child_process'
 import { getAgentJob } from './agent-jobs'
 import { normalizeRepoRelativePath, validateWriteTarget, type WriteChangeType } from './safe-access'
 import { normalizeLocalServerDeclaration, type LocalServerDeclaration } from './local-server-lifecycle'
-import { parseValidationSelectionV1, type ValidationSelectionV1 } from '@workbench/shared'
+import { parseValidationSelectionV1, type ValidationSelectionV1 } from '@mastermind/shared'
 import { validateCodexReviewRequirement, type CodexReviewRequirement } from './codex-review-contract'
 
 export const WORKBENCH_PACKET_SCHEMA_VERSION = 1 as const

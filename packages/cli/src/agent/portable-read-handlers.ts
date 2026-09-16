@@ -21,10 +21,10 @@ import { consumePreparedMcpContext } from './mcp-context-bridge'
 import { attachWorkbenchEvidence, deterministicWorkbenchEvidenceId } from './workbench-evidence-producers'
 import type { WorkbenchEvidenceStoreOptions } from './workbench-evidence-store'
 import { getWorkbenchReadResultRecovery, markWorkbenchReadResultReconciled, persistWorkbenchReadResult, type WorkbenchReadResultRecoveryIdentity, type WorkbenchReadResultRecoveryOptions } from './workbench-read-result-recovery'
-import { projectActiveRunContinuity, resolveResumeNavigation, type ActiveRunContinuity } from '@workbench/shared'
+import { projectActiveRunContinuity, resolveResumeNavigation, type ActiveRunContinuity } from '@mastermind/shared'
 import { getFocusedWorkspace } from './focused-workspace'
 import { getSourceReconciliationReport } from './source-reconciliation'
-import type { IndexedDoc } from '@workbench/shared'
+import type { IndexedDoc } from '@mastermind/shared'
 import type { WorkbenchSessionStoreOptions } from './workbench-session-store'
 
 const MAX_PATHS = 5

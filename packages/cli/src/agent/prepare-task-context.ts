@@ -1,4 +1,4 @@
-import { SearchResult } from '@workbench/shared'
+import { SearchResult } from '@mastermind/shared'
 import { BoundedSearchResult, VaultSearcher } from './search'
 import { readFile } from './vault'
 import { redactSecrets, truncateContent } from './safe-access'

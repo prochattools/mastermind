@@ -18,8 +18,8 @@
     "sourceMap": true,
     "baseUrl": ".",
     "paths": {
-      "@workbench/shared": ["packages/shared/src/index.ts"],
-      "@workbench/shared/*": ["packages/shared/src/*"]
+      "@mastermind/shared": ["packages/shared/src/index.ts"],
+      "@mastermind/shared/*": ["packages/shared/src/*"]
     }
   }
 }

@@ -17,7 +17,7 @@ import {
   canonicalizeN8nWorkflow,
   compareControlledWorkflowCandidate,
   hashCanonicalWorkflowTopology
-} from '@workbench/shared'
+} from '@mastermind/shared'
 import { findControlledN8nWorkflowGrant, type ControlledN8nWorkflowGrant } from './capability-grants'
 import {
   acquireCapabilityOperationLease,

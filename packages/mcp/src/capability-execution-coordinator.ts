@@ -7,7 +7,7 @@ import type { CapabilityPlan } from './capability-planning.js'
 import type { ProviderInventoryRecord } from './provider-inventory.js'
 import { enforceCapabilityResult, redactCapabilityText, type CapabilityAuthorizedExecutionContext, type CapabilityRuntimeIdentity, type CapabilityValidationVerifier } from './capability-runtime-enforcement.js'
 import { createPendingCapabilityArtifact, expireCapabilityArtifact, finalizeCapabilityArtifact, readBrokerOwnedArtifact, type BrokerOwnedOutputRoot, type CapabilityArtifactMetadata } from './capability-output-artifact.js'
-import { CAPABILITY_MANIFEST_MAX_INLINE_BYTES } from '@workbench/shared'
+import { CAPABILITY_MANIFEST_MAX_INLINE_BYTES } from '@mastermind/shared'
 
 export const WORKBENCH_EXECUTION_COORDINATOR_FILENAME = 'workbench-capability-executions.json' as const
 export type ExecutionLifecycleState = 'pending' | 'requested' | 'validating' | 'dispatching' | 'running' | 'executing' | 'completing' | 'completed' | 'failed' | 'cancelled' | 'expired' | 'recovered'
@@ -299,7 +299,7 @@ function boundedJobEvidence(evidence: CapabilityJobEvidence | undefined): Capabi
 }
 
 export type CapabilityJobExecution = Readonly<{
-  manifest: import('@workbench/shared').CapabilityManifest
+  manifest: import('@mastermind/shared').CapabilityManifest
   authorized: CapabilityAuthorizedExecutionContext
   identity: CapabilityRuntimeIdentity
   validationVerifiers?: Readonly<Record<string, CapabilityValidationVerifier>>

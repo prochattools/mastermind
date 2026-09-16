@@ -2,7 +2,7 @@ import fs from 'fs'
 import path from 'path'
 import { execFileSync } from 'child_process'
 import { getActiveSourceContext, getEnabledSources, loadConfig } from './config'
-import { containsProtectedRepositoryContent, evaluateConnectedRepositoryPath } from '@workbench/shared'
+import { containsProtectedRepositoryContent, evaluateConnectedRepositoryPath } from '@mastermind/shared'
 
 export type WriteChangeType =
   | 'create'

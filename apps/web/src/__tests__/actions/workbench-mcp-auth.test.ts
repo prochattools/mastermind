@@ -4,7 +4,7 @@ import os from 'node:os'
 import path from 'node:path'
 import test from 'node:test'
 import { NextRequest } from 'next/server'
-import { deriveWorkbenchMcpCredential } from '@workbench/shared/workbench-mcp-auth'
+import { deriveWorkbenchMcpCredential } from '@mastermind/shared/workbench-mcp-auth'
 
 test('accepts and attributes only the derived scoped MCP credential', async () => {
   const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'workbench-mcp-audit-'))

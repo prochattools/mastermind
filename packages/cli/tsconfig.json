@@ -18,8 +18,8 @@
     "sourceMap": false,
     "baseUrl": ".",
     "paths": {
-      "@workbench/shared": ["../../packages/shared"],
-      "@workbench/shared/*": ["../../packages/shared/*"]
+      "@mastermind/shared": ["../../packages/shared"],
+      "@mastermind/shared/*": ["../../packages/shared/*"]
     }
   },
   "include": ["src"]

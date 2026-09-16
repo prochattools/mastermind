@@ -10,7 +10,7 @@ interface LogEntry {
 }
 
 function getAuditLogPath(): string {
-  const bridgeDir = path.join(os.homedir(), '.buildflow')
+  const bridgeDir = process.env.MASTERMIND_PROVIDER_STATE_DIR || process.env.WORKBENCH_PROVIDER_STATE_DIR || path.join(os.homedir(), '.mastermind')
   return path.join(bridgeDir, 'relay.audit.log')
 }
 

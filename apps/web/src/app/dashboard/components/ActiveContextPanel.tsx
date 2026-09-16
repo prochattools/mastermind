@@ -1,4 +1,4 @@
-import type { ActiveSourcesMode, WriteMode } from '@workbench/shared'
+import type { ActiveSourcesMode, WriteMode } from '@mastermind/shared'
 
 import { DashboardButton } from './ui/DashboardButton'
 import { DashboardMetaRow } from './ui/DashboardMetaRow'
@@ -38,7 +38,7 @@ export function ActiveContextPanel({
         <DashboardSectionHeader
           eyebrow="Context"
           title="Active context"
-          detail="Choose how BuildFlow scopes sources and writes."
+          detail="Choose how Mastermind scopes sources and writes."
         />
         <div className="mt-4 grid grid-cols-3 gap-2">
           {modeButtons.map(button => {

@@ -6,7 +6,7 @@ import {
   type CapabilityManifestValidationIssue,
   type CliCapabilityArgumentTemplate,
   type CliCapabilityManifest
-} from '@workbench/shared'
+} from '@mastermind/shared'
 import { redactCapabilityText, type CapabilityAuthorizedExecutionContext } from './capability-runtime-enforcement.js'
 import type { CapabilityJobHandler, CapabilityJobHandlerContext, CapabilityJobHandlerResult } from './capability-execution-coordinator.js'
 

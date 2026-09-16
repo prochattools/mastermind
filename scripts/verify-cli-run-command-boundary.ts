@@ -61,7 +61,7 @@ function collectTypeScript(current: string): void {
 collectTypeScript(path.join(root, 'packages/cli/src'))
 for (const file of cliSourceFiles) {
   const text = fs.readFileSync(file, 'utf8')
-  assert.doesNotMatch(text, /from ['"][^'"]*shared\/src\//, `${path.relative(root, file)} must consume @workbench/shared, not Shared source paths`)
+  assert.doesNotMatch(text, /from ['"][^'"]*shared\/src\//, `${path.relative(root, file)} must consume @mastermind/shared, not Shared source paths`)
 }
 
 console.log('CLI runWorkbenchCommand server boundary verification passed')

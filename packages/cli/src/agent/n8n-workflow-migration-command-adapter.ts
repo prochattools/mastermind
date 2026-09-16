@@ -3,7 +3,7 @@ import fs from 'node:fs'
 import { loadControlledN8nWorkflowGrants, type ControlledN8nWorkflowGrant } from './capability-grants'
 import type { CapabilityOperationStoreOptions } from './capability-operation-store'
 import type { CapabilityMutationDispatchStoreOptions } from './capability-mutation-dispatch-store'
-import type { KnowledgeSource } from '@workbench/shared'
+import type { KnowledgeSource } from '@mastermind/shared'
 import type { MigrationRunCommandPlan } from './run-command-request'
 import {
   executeControlledWorkflowMigration,

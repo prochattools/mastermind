@@ -3,7 +3,7 @@ import {
   sessionAwareRunWorkbenchCommandRequestSchema,
   type N8nWorkflowMigrationRequest,
   type WorkbenchEvidenceReadOwner
-} from '@workbench/shared'
+} from '@mastermind/shared'
 import type { WorkbenchAdmissionOperation } from './workbench-admission-orchestrator'
 import type {
   ExactCommandPolicy,

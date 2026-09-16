@@ -1,5 +1,5 @@
 import crypto from 'node:crypto'
-import { containsProtectedRepositoryContent, evaluateConnectedRepositoryPath, normalizeRepositoryRelativePath } from '@workbench/shared'
+import { containsProtectedRepositoryContent, evaluateConnectedRepositoryPath, normalizeRepositoryRelativePath } from '@mastermind/shared'
 import {
   evaluateRoadmapEffectPolicy,
   normalizeRoadmapEffects,
@@ -11,7 +11,7 @@ import {
 } from './roadmap-effect-policy'
 import { normalizeLocalServerDeclaration, type LocalServerDeclaration } from './local-server-lifecycle'
 import { selectSmallestMeaningfulValidation, selectionCommandToPacketValidation, type ValidationSelectionPacketValidation } from './workbench-validation-selector'
-import { validationSelectionV1Schema, type ValidationSelectionV1 } from '@workbench/shared'
+import { validationSelectionV1Schema, type ValidationSelectionV1 } from '@mastermind/shared'
 import {
   compileCodexReviewRequirement,
   normalizeCodexReviewDeclaration,

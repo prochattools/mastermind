@@ -12,7 +12,7 @@ import { handleAdminDevices, handleAdminRequests, setDeviceMap } from './admin/e
 import { handleCreateSession, handleGetSession, handleListSessions, handleCloseSession } from './admin/session-endpoints'
 import type { PersistedDevice } from './storage/types'
 import { startup, type StartupResult } from './startup'
-import { getBuildSha, getBuildTimestamp } from '@workbench/shared'
+import { getBuildSha, getBuildTimestamp } from '@mastermind/shared'
 
 let runtimeConfig: StartupResult | null = null
 const HEARTBEAT_INTERVAL = 30000

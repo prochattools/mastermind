@@ -11,7 +11,7 @@ import {
 import {
   PERSISTED_VALIDATION_COMMAND_KINDS,
   RUN_WORKBENCH_DIRECT_COMMAND_KINDS
-} from '@workbench/shared'
+} from '@mastermind/shared'
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../../..')
 

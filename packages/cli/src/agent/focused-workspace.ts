@@ -1,12 +1,12 @@
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
-import type { FocusedWorkspaceRecord, KnowledgeSource } from '@workbench/shared'
+import type { FocusedWorkspaceRecord, KnowledgeSource } from '@mastermind/shared'
 
 const FOCUS_VERSION = 1 as const
 
 export function getFocusedWorkspacePath(): string {
-  return process.env.WORKBENCH_FOCUSED_WORKSPACE_PATH || path.join(os.homedir(), '.config', 'workbench', 'focused-workspace.json')
+  return process.env.MASTERMIND_FOCUSED_WORKSPACE_PATH || process.env.WORKBENCH_FOCUSED_WORKSPACE_PATH || path.join(os.homedir(), '.config', 'mastermind', 'focused-workspace.json')
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

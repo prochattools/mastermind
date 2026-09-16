@@ -7,7 +7,7 @@ import { applyGoalDispatchSchema } from './openapi-goal-dispatch.mjs'
 // GPT Actions run outside the owner Mac. The imported schema must advertise
 // the public tunnel, while LOCAL_DASHBOARD_BASE_URL remains an explicit
 // override for local contract tests.
-const BASE_URL = process.env.LOCAL_DASHBOARD_BASE_URL || process.env.PUBLIC_BASE_URL || 'https://workbench.prochat.tools'
+const BASE_URL = process.env.LOCAL_DASHBOARD_BASE_URL || process.env.PUBLIC_BASE_URL || 'https://mastermind.prochat.tools'
 const OUTPUT_FILE = path.resolve(process.cwd(), 'docs/openapi.chatgpt.json')
 const CANONICAL_SOURCE_FILE = path.resolve(process.cwd(), 'apps/web/src/lib/openapi-chatgpt.json')
 const FROM_SOURCE = process.argv.includes('--from-source')

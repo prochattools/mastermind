@@ -93,7 +93,7 @@ export function createWorkbenchMcpServer(params: { repoRoot: string; invoke?: In
     if (isClientWorkflowTool(name)) {
       if (!scope.clientWorkflowTools.has(name)) throw new McpError(ErrorCode.MethodNotFound, 'Unknown or unadmitted Workbench MCP tool.')
       const input = (request.params.arguments ?? {}) as Record<string, unknown>
-      const options = { rootDir: process.env.WORKBENCH_PROVIDER_STATE_DIR }
+      const options = { rootDir: process.env.MASTERMIND_PROVIDER_STATE_DIR || process.env.WORKBENCH_PROVIDER_STATE_DIR }
       let result: unknown
       if (name === 'mcpClientSessionCreate') result = createClientWorkflowSession({ clientId: String(input.clientId ?? ''), ownerId: `owner-${typeof process.getuid === 'function' ? process.getuid() : 'local'}`, expiresAt: String(input.expiresAt ?? '') }, options)
       else if (name === 'mcpClientSessionStatus') result = getClientWorkflowSession(String(input.clientSessionId ?? ''), options)

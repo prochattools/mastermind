@@ -9,7 +9,7 @@ import {
   WorkbenchEvidenceOwnerSchema,
   type WorkbenchEvidenceOwner,
   type WorkbenchEvidenceRecord
-} from '@workbench/shared'
+} from '@mastermind/shared'
 import { getWorkbenchSession, type WorkbenchSessionStoreOptions } from './workbench-session-store'
 
 export const WORKBENCH_READ_RESULT_RECOVERY_VERSION = 1 as const

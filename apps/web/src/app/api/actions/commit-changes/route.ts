@@ -104,7 +104,7 @@ export async function POST(request: NextRequest) {
         operationId: 'commitBuildFlowChanges',
         phase: committed ? 'completed' : 'failed',
         actionLabel: 'Committed explicit repo paths',
-        userMessage: committed ? `BuildFlow committed ${paths.length} explicit path(s).` : 'BuildFlow could not commit the staged paths.',
+        userMessage: committed ? `Mastermind committed ${paths.length} explicit path(s).` : 'Mastermind could not commit the staged paths.',
         sourceId,
         changedPaths: paths.slice(0, 5),
         riskLevel: 'medium',

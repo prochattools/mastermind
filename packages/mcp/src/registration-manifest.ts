@@ -3,7 +3,7 @@ import { Ajv, type ValidateFunction } from 'ajv'
 import {
   RUN_WORKBENCH_DIRECT_COMMAND_KINDS,
   type RunWorkbenchDirectCommandKind
-} from '@workbench/shared'
+} from '@mastermind/shared'
 import { WORKBENCH_TOOL_NAMES, type WorkbenchToolName } from './contracts.js'
 import {
   BRAIN_PROFILE_ALLOWED_COMMAND_KINDS,

@@ -53,9 +53,9 @@ const toErrorDetail = (err: unknown) => (err instanceof Error ? `${err.name}: ${
 const unavailablePayload = (err: unknown): AgentErrorPayload => ({
   status: 'error',
   code: 'AGENT_UNAVAILABLE',
-  error: 'BuildFlow agent is unavailable',
-  message: 'BuildFlow agent is unavailable',
-  userMessage: 'BuildFlow could not reach the local agent. Check that buildflow serve is running, then retry.',
+  error: 'Mastermind agent is unavailable',
+  message: 'Mastermind agent is unavailable',
+  userMessage: 'Mastermind could not reach the local agent. Check that the legacy buildflow serve command is running, then retry.',
   detail: toErrorDetail(err),
   retryable: true
 })
@@ -63,14 +63,14 @@ const unavailablePayload = (err: unknown): AgentErrorPayload => ({
 const upstreamErrorPayload = (status: number, data: Record<string, unknown>): AgentErrorPayload & Record<string, unknown> => ({
   status: 'error',
   code: 'AGENT_ERROR',
-  error: typeof data.error === 'string' ? data.error : `BuildFlow agent returned ${status}`,
+  error: typeof data.error === 'string' ? data.error : `Mastermind agent returned ${status}`,
   message:
     typeof data.message === 'string'
       ? data.message
       : typeof data.error === 'string'
         ? data.error
-        : `BuildFlow agent returned ${status}`,
-  userMessage: typeof data.userMessage === 'string' ? data.userMessage : 'BuildFlow agent returned an error for this source action.',
+        : `Mastermind agent returned ${status}`,
+  userMessage: typeof data.userMessage === 'string' ? data.userMessage : 'Mastermind agent returned an error for this source action.',
   detail: typeof data.detail === 'string' ? data.detail : typeof data.details === 'string' ? data.details : undefined,
   retryable: status >= 500,
   upstreamStatus: status,
@@ -102,8 +102,8 @@ export async function fetchAgentJson(pathname: string, options: AgentProxyOption
         data: {
           status: 'timeout',
           code: 'AGENT_TIMEOUT',
-          error: 'BuildFlow agent request timed out',
-          message: 'BuildFlow agent request timed out',
+          error: 'Mastermind agent request timed out',
+          message: 'Mastermind agent request timed out',
           userMessage: 'The local agent is reachable but did not finish this request before the timeout.',
           detail: toErrorDetail(err),
           retryable: true,

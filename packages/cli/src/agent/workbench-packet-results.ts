@@ -3,7 +3,7 @@ import path from 'path'
 import { execFileSync } from 'node:child_process'
 import { getConfigDir } from '../utils/paths'
 import type { WorkbenchPacketExecutionResult } from './workbench-packet-executor'
-import { WorkbenchEvidenceMetadataSchema, type WorkbenchEvidenceMetadata } from '@workbench/shared'
+import { WorkbenchEvidenceMetadataSchema, type WorkbenchEvidenceMetadata } from '@mastermind/shared'
 import type { WorkbenchEvidenceUnavailable } from './workbench-evidence-producers'
 import type { WorkbenchExecutorResult } from '../../../mcp/dist/executor-broker.js'
 

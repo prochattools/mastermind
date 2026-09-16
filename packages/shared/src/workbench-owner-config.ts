@@ -6,8 +6,8 @@ import { TextDecoder } from 'node:util'
 const MAX_CONFIG_BYTES = 64 * 1024
 const MIN_TOKEN_LENGTH = 16
 const MAX_TOKEN_LENGTH = 4096
-const CANONICAL_KEY = 'WORKBENCH_ACTION_TOKEN'
-const LEGACY_KEY = 'BUILDFLOW_ACTION_TOKEN'
+const CANONICAL_KEY = 'MASTERMIND_ACTION_TOKEN'
+const LEGACY_KEYS = new Set(['WORKBENCH_ACTION_TOKEN', 'BUILDFLOW_ACTION_TOKEN'])
 
 export type WorkbenchOwnerConfigErrorCode =
   | 'CONFIG_UNAVAILABLE'
@@ -64,7 +64,7 @@ function parseAssignments(raw: string, options: ReadOptions): Map<string, string
       if (options.allowUnknown) continue
       fail('CONFIG_INVALID')
     }
-    if (match[1] !== CANONICAL_KEY && match[1] !== LEGACY_KEY) {
+    if (match[1] !== CANONICAL_KEY && !LEGACY_KEYS.has(match[1])) {
       if (options.allowUnknown) continue
       fail('CONFIG_INVALID')
     }
@@ -117,14 +117,17 @@ function readOwnerFile(file: string, options: ReadOptions): string {
 
 export function resolveWorkbenchOwnerConfigPath(homeDir = os.userInfo().homedir): string {
   if (!path.isAbsolute(homeDir)) fail('CONFIG_UNSAFE')
-  return path.join(homeDir, '.config', 'workbench', 'runtime.env')
+  const canonical = path.join(homeDir, '.config', 'mastermind', 'runtime.env')
+  const legacy = path.join(homeDir, '.config', 'workbench', 'runtime.env')
+  return fs.existsSync(canonical) || !fs.existsSync(legacy) ? canonical : legacy
 }
 
 export function readWorkbenchActionTokenSource(file: string, options: ReadOptions = {}): string {
   const values = parseAssignments(readOwnerFile(file, options), options)
   const canonical = values.get(CANONICAL_KEY)
-  const legacy = values.get(LEGACY_KEY)
-  if (canonical && legacy) fail('CONFIG_INVALID')
+  const legacyValues = [...LEGACY_KEYS].map(key => values.get(key)).filter(Boolean)
+  if (legacyValues.length > 1 || (canonical && legacyValues.length > 0)) fail('CONFIG_INVALID')
+  const legacy = legacyValues[0]
   if (legacy && !options.allowLegacy) fail('LEGACY_KEY_NOT_ALLOWED')
   return validateToken(canonical || legacy)
 }

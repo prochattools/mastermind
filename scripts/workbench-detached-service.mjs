@@ -9,7 +9,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url'
 
 const SCRIPT_PATH = fileURLToPath(import.meta.url)
 const REPO_ROOT = path.resolve(path.dirname(SCRIPT_PATH), '..')
-const DEFAULT_RUN_DIR = path.join(os.userInfo().homedir, '.config', 'workbench', 'runtime-state')
+const DEFAULT_RUN_DIR = path.join(os.userInfo().homedir, '.config', 'mastermind', 'runtime-state')
 const DEFAULT_MAX_LOG_BYTES = 2 * 1024 * 1024
 const DEFAULT_STOP_TIMEOUT_MS = 5_000
 const OWNER_CONFIG_MODULE = path.join(REPO_ROOT, 'packages', 'shared', 'dist', 'workbench-owner-config.js')
@@ -29,13 +29,17 @@ const COMMON_ENV_KEYS = [
   'npm_package_version',
   'WORKBENCH_PACKAGE_VERSION',
   'WORKBENCH_BUILD_SHA',
-  'WORKBENCH_BUILD_TIMESTAMP'
+  'WORKBENCH_BUILD_TIMESTAMP',
+  'MASTERMIND_PACKAGE_VERSION',
+  'MASTERMIND_BUILD_SHA',
+  'MASTERMIND_BUILD_TIMESTAMP'
 ]
 
 const AGENT_ENV_KEYS = [
   ...COMMON_ENV_KEYS,
   'BRIDGE_URL',
   'BUILDFLOW_CONFIG_DIR',
+  'MASTERMIND_CONFIG_DIR',
   'DEBUG',
   'DEVICE_TOKEN',
   'N8N_API_KEY',
@@ -70,13 +74,15 @@ export function injectOwnerActionToken(environment, actionToken) {
   const env = { ...environment }
   delete env.WORKBENCH_ACTION_TOKEN
   delete env.BUILDFLOW_ACTION_TOKEN
-  return { ...env, WORKBENCH_ACTION_TOKEN: actionToken }
+  delete env.MASTERMIND_ACTION_TOKEN
+  return { ...env, MASTERMIND_ACTION_TOKEN: actionToken, WORKBENCH_ACTION_TOKEN: actionToken }
 }
 
 export function injectOwnerTransport(environment, transport) {
   const env = { ...environment }
+  delete env.MASTERMIND_TRANSPORT
   delete env.WORKBENCH_TRANSPORT
-  return { ...env, WORKBENCH_TRANSPORT: transport }
+  return { ...env, MASTERMIND_TRANSPORT: transport, WORKBENCH_TRANSPORT: transport }
 }
 
 async function loadOwnerActionConfig() {

@@ -1,4 +1,4 @@
-import type { KnowledgeSource } from '@workbench/shared'
+import type { KnowledgeSource } from '@mastermind/shared'
 import { getSourcesSafe } from './config'
 import { activateContextProposal, type ContextActivationRequest, type ContextActivationResult } from './context-activation-service'
 import { getContextSession, type ContextIntelligenceStoreOptions } from './context-intelligence-store'

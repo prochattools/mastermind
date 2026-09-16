@@ -1,5 +1,5 @@
 {
-  "name": "@workbench/mcp",
+  "name": "@mastermind/mcp",
   "version": "1.3.25-beta",
   "private": true,
   "license": "AGPL-3.0-only",
@@ -311,7 +311,7 @@
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "1.29.0",
-    "@workbench/shared": "workspace:*",
+    "@mastermind/shared": "workspace:*",
     "ajv": "8.20.0",
     "smol-toml": "1.7.0",
     "zod-to-json-schema": "3.25.2"

@@ -1,7 +1,7 @@
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
-import type { ConfiguredProvider, WorkspaceConfiguration } from '@workbench/shared'
+import type { ConfiguredProvider, WorkspaceConfiguration } from '@mastermind/shared'
 import { discoverProviderManifests, type ProviderDiscoveryFailure, type ProviderDiscoveryCandidate, type WorkbenchProviderCategory } from './provider-discovery.js'
 
 export const WORKSPACE_CONFIGURATION_VERSION = 1 as const
@@ -56,7 +56,7 @@ function expandTilde(value: string): string {
 
 function defaultConfigPath(options: WorkspaceConfigurationOptions = {}): string {
   if (options.configPath) return path.resolve(expandTilde(options.configPath))
-  const dir = options.configDir ?? process.env.WORKBENCH_CONFIG_DIR ?? path.join(os.homedir(), '.config', 'workbench')
+  const dir = options.configDir ?? process.env.MASTERMIND_CONFIG_DIR ?? process.env.WORKBENCH_CONFIG_DIR ?? path.join(os.homedir(), '.config', 'mastermind')
   return path.join(path.resolve(expandTilde(dir)), WORKSPACE_CONFIGURATION_FILENAME)
 }
 

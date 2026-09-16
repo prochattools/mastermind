@@ -22,9 +22,9 @@ for (const entry of fs.readdirSync(sharedSource, { withFileTypes: true })) {
 
 const webConfig = JSON.parse(fs.readFileSync(path.join(root, 'apps/web/tsconfig.json'), 'utf8'))
 const rootConfig = JSON.parse(fs.readFileSync(path.join(root, 'tsconfig.base.json'), 'utf8'))
-assert.deepEqual(webConfig.compilerOptions?.paths?.['@workbench/shared'], ['../../packages/shared/src/index.ts'])
-assert.deepEqual(rootConfig.compilerOptions?.paths?.['@workbench/shared'], ['packages/shared/src/index.ts'])
-assert.deepEqual(rootConfig.compilerOptions?.paths?.['@workbench/shared/*'], ['packages/shared/src/*'])
+assert.deepEqual(webConfig.compilerOptions?.paths?.['@mastermind/shared'], ['../../packages/shared/src/index.ts'])
+assert.deepEqual(rootConfig.compilerOptions?.paths?.['@mastermind/shared'], ['packages/shared/src/index.ts'])
+assert.deepEqual(rootConfig.compilerOptions?.paths?.['@mastermind/shared/*'], ['packages/shared/src/*'])
 
 const sharedConfig = JSON.parse(fs.readFileSync(path.join(root, 'packages/shared/tsconfig.json'), 'utf8'))
 assert.equal(sharedConfig.compilerOptions?.outDir, 'dist', 'Shared compiler output must remain confined to dist')

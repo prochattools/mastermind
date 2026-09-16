@@ -1,7 +1,7 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import crypto from 'node:crypto'
-import type { KnowledgeSource } from '@workbench/shared'
+import type { KnowledgeSource } from '@mastermind/shared'
 import type { ContextSession, IndexJob, IndexJobResult, RepositoryHealth } from './context-intelligence-models'
 import { getContextSession, type ContextIntelligenceStoreOptions } from './context-intelligence-store'
 import { observeRepositoryHealth, type RepositoryHealthObserverOptions } from './repository-health-observer'

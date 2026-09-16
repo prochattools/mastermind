@@ -6,7 +6,7 @@ import { runSafeCommand, type SafeCommandRequest, type SafeCommandResult } from 
 import { recordValidationJobTelemetry, type TerminalValidationJobStatus } from './validation-job-telemetry'
 import { recordGitLockTelemetry } from './git-lock-telemetry'
 import { appendAgentEvent, hasValidationActivityEvent } from './agent-events'
-import { WorkbenchEvidenceMetadataSchema, type WorkbenchEvidenceMetadata } from '@workbench/shared'
+import { WorkbenchEvidenceMetadataSchema, type WorkbenchEvidenceMetadata } from '@mastermind/shared'
 import { attachWorkbenchEvidence, type WorkbenchEvidenceUnavailable } from './workbench-evidence-producers'
 import { redactSecrets } from './safe-access'
 

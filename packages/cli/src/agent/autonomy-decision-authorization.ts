@@ -5,8 +5,8 @@ import {
   type AutonomyPolicyEvaluation,
   type AutonomyPolicyEvaluationInput,
   type AutonomyPolicyLayer
-} from '@workbench/shared'
-import { createAutonomyDecisionRequest, type AutonomyDecisionRequest } from '@workbench/shared'
+} from '@mastermind/shared'
+import { createAutonomyDecisionRequest, type AutonomyDecisionRequest } from '@mastermind/shared'
 import { lookupAutonomyDecision, type AutonomyDecisionLookup, type AutonomyDecisionStoreOptions } from './autonomy-decision-store'
 
 export type AutonomyDecisionAuthorizationInput = {

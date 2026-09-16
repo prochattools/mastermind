@@ -5,7 +5,7 @@ import {
   type WorkbenchEvidenceOwner,
   type WorkbenchEvidenceRecord,
   type WorkbenchEvidenceRetentionClass
-} from '@workbench/shared'
+} from '@mastermind/shared'
 import {
   appendWorkbenchEvidence,
   readWorkbenchEvidence,

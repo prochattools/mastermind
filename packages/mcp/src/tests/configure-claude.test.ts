@@ -11,8 +11,8 @@ import {
   BRAIN_PROFILE_ALLOWED_CLIENT_WORKFLOW_TOOLS,
   PROFILE_AVAILABILITY
 } from '../configure-core.js'
-import { installWorkbenchOwnerConfig } from '@workbench/shared/workbench-owner-config'
-import { deriveWorkbenchMcpCredential } from '@workbench/shared/workbench-mcp-auth'
+import { installWorkbenchOwnerConfig } from '@mastermind/shared/workbench-owner-config'
+import { deriveWorkbenchMcpCredential } from '@mastermind/shared/workbench-mcp-auth'
 
 function createMockClaudeBin(homeDir: string): string {
   const binDir = path.join(homeDir, '.local', 'bin')

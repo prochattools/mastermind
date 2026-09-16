@@ -8,7 +8,7 @@ import { getSourceIndexBinding, loadConfig, saveConfig, withSourceDefaults, with
 import { getIndexRecord, upsertIndexState } from './index-state'
 import { IndexScanError, Indexer } from './indexer'
 import { INDEX_SCAN_EXCLUSION_VERSION, INDEX_SCAN_POLICY_ID, INDEX_SCAN_POLICY_VERSION } from './index-scan-policy'
-import type { KnowledgeSource } from '@workbench/shared'
+import type { KnowledgeSource } from '@mastermind/shared'
 
 // ---------------------------------------------------------------------------
 // Types
@@ -63,7 +63,7 @@ type KnowledgeSourceExt = KnowledgeSource & { isManagedWorktree?: boolean }
 const GIT_TIMEOUT_MS = 2000
 const activeReindexes = new Set<string>()
 const indexRetryAttempts = new Map<string, number>()
-export const MANAGED_WORKTREES_BASE = path.join(os.homedir(), '.buildflow', 'worktrees')
+export const MANAGED_WORKTREES_BASE = path.join(os.homedir(), '.mastermind', 'worktrees')
 
 // Fixed Git executable — no PATH resolution
 const GIT_EXECUTABLE = '/usr/bin/git'

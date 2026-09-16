@@ -26,7 +26,7 @@ export async function POST(request: NextRequest) {
 
     if (!device) {
       return NextResponse.json(
-        { error: 'No active BuildFlow device is online.' },
+        { error: 'No active Mastermind device is online.' },
         { status: 503 }
       )
     }

@@ -2,7 +2,7 @@ import type { Metadata } from 'next'
 import './globals.css'
 
 export const metadata: Metadata = {
-  title: 'ProChat Workbench',
+  title: 'Mastermind',
   description: 'Work safely with your local projects through ChatGPT'
 }
 

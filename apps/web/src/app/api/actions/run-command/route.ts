@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { sessionAwareRunWorkbenchCommandRequestSchema } from '@workbench/shared'
+import { sessionAwareRunWorkbenchCommandRequestSchema } from '@mastermind/shared'
 import { checkActionAuth } from '@/lib/actionAuth'
 import { dispatchWorkbenchCommand } from '@/lib/actions/portable-operation-adapters'
 import { sourceSelectionRequired, unwrapActionError } from '@/lib/actions/gpt'
@@ -199,7 +199,7 @@ export async function POST(request: NextRequest) {
         status: 'timeout',
         error: {
           code: 'WORKBENCH_COMMAND_TIMEOUT',
-          message: 'BuildFlow stopped this command before the GPT action deadline.',
+          message: 'Mastermind stopped this command before the GPT action deadline.',
           details: `${commandKind} exceeded ${timeoutMs}ms.`,
           recovery: [
             suggestedNextAction(commandKind),

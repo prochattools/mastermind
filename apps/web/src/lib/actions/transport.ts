@@ -66,7 +66,7 @@ async function readJsonResponse(response: Response, endpoint: string, maxRespons
       413,
       buildActionErrorEnvelope({
         code: 'RESPONSE_SIZE_EXCEEDED',
-        message: 'Workbench response exceeded size limit.',
+        message: 'Mastermind response exceeded size limit.',
         details: `Response was ${responseBytes} bytes, limit is ${maxResponseBytes} bytes.`,
         recovery: ['Use a narrower read mode', 'Reduce file count or size', 'Use grep_context instead of read_paths for large files'],
         status: 'error'
@@ -80,7 +80,7 @@ async function readJsonResponse(response: Response, endpoint: string, maxRespons
       response.status >= 400 ? response.status : 502,
       buildActionErrorEnvelope({
         code: 'EMPTY_RELAY_RESPONSE',
-        message: 'Workbench returned an empty response.',
+        message: 'Mastermind returned an empty response.',
         details: `The upstream response for ${endpoint} had no body.`,
         status: 'error'
       })
@@ -97,7 +97,7 @@ async function readJsonResponse(response: Response, endpoint: string, maxRespons
       response.status >= 400 ? response.status : 502,
       buildActionErrorEnvelope({
         code: 'INVALID_RELAY_RESPONSE',
-        message: 'Workbench returned invalid JSON.',
+        message: 'Mastermind returned invalid JSON.',
         details: `The upstream response for ${endpoint} could not be parsed as JSON.`,
         status: 'error'
       })
@@ -116,7 +116,7 @@ async function readResponseText(response: Response, endpoint: string, maxRespons
         413,
         buildActionErrorEnvelope({
           code: 'RESPONSE_SIZE_EXCEEDED',
-          message: 'Workbench response exceeded size limit.',
+          message: 'Mastermind response exceeded size limit.',
           details: `Response from ${endpoint} exceeded ${GPT_ACTION_RESPONSE_CHAR_LIMIT} characters or ${maxResponseBytes} bytes.`,
           recovery: ['Use a narrower read mode', 'Reduce file count or size', 'Use grep_context instead of broad reads'],
           status: 'needs_narrower_scope'
@@ -147,7 +147,7 @@ async function readResponseText(response: Response, endpoint: string, maxRespons
           413,
           buildActionErrorEnvelope({
             code: 'RESPONSE_SIZE_EXCEEDED',
-            message: 'Workbench response exceeded size limit.',
+            message: 'Mastermind response exceeded size limit.',
             details: `Response exceeded ${GPT_ACTION_RESPONSE_CHAR_LIMIT} characters or ${maxResponseBytes} bytes while reading.`,
             recovery: ['Use a narrower read mode', 'Reduce file count or size', 'Use grep_context instead of broad reads'],
             status: 'needs_narrower_scope'
@@ -164,7 +164,7 @@ async function readResponseText(response: Response, endpoint: string, maxRespons
         413,
         buildActionErrorEnvelope({
           code: 'RESPONSE_SIZE_EXCEEDED',
-          message: 'Workbench response exceeded size limit.',
+          message: 'Mastermind response exceeded size limit.',
           details: `Response exceeded ${GPT_ACTION_RESPONSE_CHAR_LIMIT} characters or ${maxResponseBytes} bytes while reading.`,
           recovery: ['Use a narrower read mode', 'Reduce file count or size', 'Use grep_context instead of broad reads'],
           status: 'needs_narrower_scope'
@@ -201,7 +201,7 @@ function normalizeTransportFailure(err: unknown, endpoint: string, options: { ti
       200,
       buildActionErrorEnvelope({
         code: 'LOCAL_STACK_TIMEOUT',
-        message: 'Workbench local stack timed out.',
+        message: 'Mastermind local stack timed out.',
         details: `The request to ${endpoint} exceeded ${options.timeoutMs}ms.`,
         recovery: ['Retry the exact bounded read.', 'Use grep_context or read_range if the request remains slow.', 'Run pnpm local:verify only if health checks also fail.'],
         status: 'timeout',
@@ -217,7 +217,7 @@ function normalizeTransportFailure(err: unknown, endpoint: string, options: { ti
       200,
       buildActionErrorEnvelope({
         code: 'LOCAL_STACK_UNAVAILABLE',
-        message: 'Workbench local stack is unavailable.',
+        message: 'Mastermind local stack is unavailable.',
         details: 'Docker/OrbStack may be stopped or the relay is not running.',
         recovery: ['Open OrbStack', 'Run pnpm local:restart', 'Run scripts/buildflow-local-stack.sh status'],
         status: 'unavailable',

@@ -13,7 +13,7 @@ import { startLocalServer, type LocalServerHandle, type LocalServerLifecycleEven
 import { completeWorkbenchExecutionJournal, markWorkbenchExecutionJournalStep, prepareWorkbenchExecutionJournal, restoreWorkbenchExecutionJournal, type WorkbenchExecutionJournal } from './workbench-execution-journal'
 import { planWorkbenchPacketExecution } from './workbench-packet-plan'
 import { attachWorkbenchEvidence, type WorkbenchEvidenceUnavailable } from './workbench-evidence-producers'
-import type { WorkbenchEvidenceMetadata, ValidationSelectionNode } from '@workbench/shared'
+import type { WorkbenchEvidenceMetadata, ValidationSelectionNode } from '@mastermind/shared'
 import type { WorkbenchGoalCommand, WorkbenchGoalRead } from './workbench-packets'
 import {
   getCompactWorkbenchValidationJob,

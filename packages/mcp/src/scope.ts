@@ -3,7 +3,7 @@ import {
   SAFE_MCP_VALIDATION_COMMAND_KINDS,
   type PersistedValidationCommandKind,
   type RunWorkbenchDirectCommandKind
-} from '@workbench/shared'
+} from '@mastermind/shared'
 import { WORKBENCH_TOOL_NAMES, type WorkbenchToolName } from './contracts.js'
 import {
   BRAIN_PROFILE_ALLOWED_CLIENT_WORKFLOW_TOOLS,

@@ -1,7 +1,7 @@
 import crypto from 'node:crypto'
 import fs from 'node:fs'
 import path from 'node:path'
-import { isAutonomyDecisionRequest, type AutonomyDecisionEvidenceReference, type AutonomyDecisionRequest } from '@workbench/shared'
+import { isAutonomyDecisionRequest, type AutonomyDecisionEvidenceReference, type AutonomyDecisionRequest } from '@mastermind/shared'
 import { getConfigDir } from '../utils/paths'
 
 export const WORKBENCH_APPROVAL_INTENT_STORE_VERSION = 1 as const

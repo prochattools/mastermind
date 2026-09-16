@@ -960,7 +960,7 @@ for (const [label, pattern] of [
 }
 
 const runCommandRoute = fs.readFileSync(path.join(process.cwd(), 'apps/web/src/app/api/actions/run-command/route.ts'), 'utf8')
-assert(runCommandRoute.includes("import { sessionAwareRunWorkbenchCommandRequestSchema } from '@workbench/shared'"), 'run-command route must import the shared session-aware strict parser')
+assert(runCommandRoute.includes("import { sessionAwareRunWorkbenchCommandRequestSchema } from '@mastermind/shared'"), 'run-command route must import the shared session-aware strict parser')
 assert(runCommandRoute.includes('sessionAwareRunWorkbenchCommandRequestSchema.safeParse(rawBody)'), 'run-command route must use the shared session-aware strict parser')
 assert(
   runCommandRoute.includes("if (clean.status === 'timed_out' && validationJobOperation === undefined)"),

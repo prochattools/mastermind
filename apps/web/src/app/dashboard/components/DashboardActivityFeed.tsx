@@ -33,7 +33,7 @@ export function DashboardActivityFeed({ entries, emptyMessage }: DashboardActivi
   return (
     <DashboardPanel variant="flat" className="h-full min-h-0 overflow-hidden">
       <div className="border-b border-bf-border/70 px-4 py-3 dark:border-slate-800/70">
-        <DashboardSectionHeader eyebrow="Activity" title="Recent BuildFlow events" />
+        <DashboardSectionHeader eyebrow="Activity" title="Recent Mastermind events" />
       </div>
       <div className="max-h-[calc(100vh-16rem)] overflow-y-auto">
         {entries.length === 0 ? (

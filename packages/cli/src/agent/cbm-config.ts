@@ -41,9 +41,9 @@ function parseProvider(value: unknown): CbmProviderConfiguration | undefined {
 }
 
 function configDir(): string {
-  const override = (process.env.WORKBENCH_CONFIG_DIR ?? '').trim()
+  const override = (process.env.MASTERMIND_CONFIG_DIR ?? process.env.WORKBENCH_CONFIG_DIR ?? '').trim()
   if (override) return path.resolve(override.startsWith('~') ? path.join(os.homedir(), override.slice(1)) : override)
-  return path.join(os.homedir(), '.buildflow')
+  return path.join(os.homedir(), '.mastermind')
 }
 
 function configPath(dir?: string): string {

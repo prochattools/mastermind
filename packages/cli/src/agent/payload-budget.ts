@@ -7,4 +7,4 @@ export {
   measureJsonPayload,
   payloadBudgetReport,
   type PayloadBudgetReport
-} from '@workbench/shared'
+} from '@mastermind/shared'

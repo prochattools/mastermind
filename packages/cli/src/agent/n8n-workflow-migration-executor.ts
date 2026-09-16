@@ -17,7 +17,7 @@ import {
   type ControlledWorkflowProtectedDomain,
   type ProtectedWorkflowSnapshot,
   type ControlledWorkflowReadbackResult
-} from '@workbench/shared'
+} from '@mastermind/shared'
 import {
   controlledN8nWorkflowGrantSchema,
   type ControlledN8nWorkflowGrant

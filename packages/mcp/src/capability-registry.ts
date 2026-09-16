@@ -13,7 +13,7 @@ import {
   type CapabilityManifestInspection,
   type CliCapabilityManifestInspection,
   type CapabilityManifestValidationIssue
-} from '@workbench/shared'
+} from '@mastermind/shared'
 import type { CapabilityJobHandler } from './capability-execution-coordinator.js'
 import { validateReadOnlyCliCapabilityManifest } from './capability-read-only-cli.js'
 import { validateIsolatedOutputCliCapabilityManifest } from './capability-isolated-output-cli.js'
@@ -142,13 +142,13 @@ function validateConfiguredManifest(value: unknown): { ok: true; value: Capabili
 
 function inspectConfiguredManifest(manifest: CapabilityManifest): CapabilityManifestInspection | CliCapabilityManifestInspection {
   return hasCliDeclaration(manifest)
-    ? inspectCliCapabilityManifest(manifest as import('@workbench/shared').CliCapabilityManifest)
+    ? inspectCliCapabilityManifest(manifest as import('@mastermind/shared').CliCapabilityManifest)
     : inspectCapabilityManifest(manifest)
 }
 
 function formatConfiguredManifest(manifest: CapabilityManifest): string {
   return hasCliDeclaration(manifest)
-    ? formatCliCapabilityManifestInspection(manifest as import('@workbench/shared').CliCapabilityManifest)
+    ? formatCliCapabilityManifestInspection(manifest as import('@mastermind/shared').CliCapabilityManifest)
     : formatCapabilityManifestInspection(manifest)
 }
 

@@ -1,4 +1,4 @@
-# ProChat Workbench
+# ProChat Mastermind
 
 A review-first local workbench for safely applying AI-assisted workflows to
 repositories and project documentation.
@@ -9,18 +9,18 @@ Created and maintained by
 [Steve Westhoek](https://github.com/stevewesthoek)
 under the [ProChat organization](https://github.com/prochattools).
 
-**ProChat Workbench lets ChatGPT work safely with your real local projects.**
+**ProChat Mastermind lets ChatGPT work safely with your real local projects.**
 
-Connect a Custom GPT to your own computer and use ChatGPT as the reasoning interface for local repositories, documentation, plans, notes, and knowledge folders. Workbench provides exact source context, guarded file operations, bounded local execution, validation, checkpoints, and explicit-path Git workflows.
+Connect a Custom GPT to your own computer and use ChatGPT as the reasoning interface for local repositories, documentation, plans, notes, and knowledge folders. Mastermind provides exact source context, guarded file operations, bounded local execution, validation, checkpoints, and explicit-path Git workflows.
 
-ProChat Workbench is free, self-hosted, and local-first. It is designed for developers, QA engineers, technical consultants, and documentation-heavy teams who want AI assistance without moving project knowledge into a hosted coding-agent platform.
+ProChat Mastermind is free, self-hosted, and local-first. It is designed for developers, QA engineers, technical consultants, and documentation-heavy teams who want AI assistance without moving project knowledge into a hosted coding-agent platform.
 
 ```text
-Public product name: ProChat Workbench
+Public product name: ProChat Mastermind
 Technical compatibility name: BuildFlow
 ```
 
-Use **ProChat Workbench** in public documentation, GitHub descriptions, CV links, interviews, and beta onboarding. The BuildFlow name remains only where older package names, scripts, config paths, source IDs, or API compatibility surfaces still require it.
+Use **ProChat Mastermind** in current public documentation, descriptions, links, interviews, and onboarding. The Workbench and BuildFlow names remain only where historical evidence or older package names, scripts, config paths, source IDs, or API compatibility surfaces still require them. The live endpoint remains `https://workbench.prochat.tools` until the approved cutover to `https://mastermind.prochat.tools`.
 
 If this project helps you, please **star it, fork it, try it on a real repo, open issues, request features, and share what you build with it.**
 

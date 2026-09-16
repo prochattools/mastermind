@@ -1,4 +1,4 @@
-import type { ActiveSourcesMode, KnowledgeSource, WriteMode } from '@workbench/shared'
+import type { ActiveSourcesMode, KnowledgeSource, WriteMode } from '@mastermind/shared'
 
 import type { DashboardLocalPlan } from '../types'
 import { DashboardButton } from './ui/DashboardButton'
@@ -68,7 +68,7 @@ export function SetupChecklistPanel({
     {
       id: 'agent',
       title: 'Local agent running',
-      detail: agentConnected ? 'BuildFlow can reach the local agent.' : 'Start the local stack with pnpm local:restart.',
+      detail: agentConnected ? 'Mastermind can reach the local agent.' : 'Start the local stack with pnpm local:restart.',
       done: agentConnected,
       warn: !agentConnected
     },

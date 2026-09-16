@@ -2,7 +2,7 @@ import {
   validateCliCapabilityManifest,
   type CapabilityManifestValidationIssue,
   type CliCapabilityManifest
-} from '@workbench/shared'
+} from '@mastermind/shared'
 import type {
   CapabilityJobHandler,
   CapabilityJobHandlerContext,

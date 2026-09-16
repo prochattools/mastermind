@@ -1,4 +1,4 @@
-import type { KnowledgeSource, WriteMode } from '@workbench/shared'
+import type { KnowledgeSource, WriteMode } from '@mastermind/shared'
 import { CheckCircle2 } from 'lucide-react'
 
 import {
@@ -69,7 +69,7 @@ export function DashboardOverview({
             <DashboardSectionHeader
               eyebrow="Overview"
               title="Good morning, Steve"
-              detail="BuildFlow Local is your compact AI workbench for sources, plans, and safe execution."
+              detail="Mastermind is your compact local workspace for sources, plans, and safe execution."
             />
             <div className="mt-3 flex flex-wrap items-center gap-2 text-[12px] text-bf-muted dark:text-slate-300">
               <span className="inline-flex items-center gap-1.5"><DashboardStatusDot tone={agentConnected ? 'good' : 'neutral'} />{agentConnected ? 'Agent connected' : 'Agent offline'}</span>

@@ -62,7 +62,7 @@ function logActionEvent(event: string, diagnostics: ActionDiagnostics) {
 function buildDeadlinePayload(context: DeadlineContext, params: DeadlineParams) {
   return buildActionErrorEnvelope({
     code: 'WORKBENCH_ACTION_DEADLINE_EXCEEDED',
-    message: 'Workbench stopped this action before the hosting gateway timed out.',
+    message: 'Mastermind stopped this action before the hosting gateway timed out.',
     details: `${params.operationId} exceeded its ${params.deadlineMs}ms GPT-facing deadline.`,
     recovery: DEFAULT_RECOVERY,
     status: 'timeout',
@@ -208,9 +208,9 @@ export async function withGptActionDeadline(
             ? 'WORKBENCH_AUTH_ERROR'
             : statusCode >= 500 ? 'WORKBENCH_STATUS_ERROR' : 'WORKBENCH_ACTION_ERROR',
           message: statusCode === 401 || statusCode === 403
-            ? 'Workbench authentication failed.'
-            : statusCode >= 500 ? 'Workbench action failed before response completion.' : 'Workbench action returned an unstructured error.',
-          details: statusCode >= 500 ? 'The Workbench backend did not return a safe structured response.' : undefined,
+            ? 'Mastermind authentication failed.'
+            : statusCode >= 500 ? 'Mastermind action failed before response completion.' : 'Mastermind action returned an unstructured error.',
+          details: statusCode >= 500 ? 'The Mastermind backend did not return a safe structured response.' : undefined,
           status: controller.signal.aborted ? 'timeout' : 'error',
           connected: statusCode !== 401 && statusCode !== 403,
           requestId,

@@ -8,7 +8,7 @@ import {
   GPT_ACTION_DEFAULT_FILE_BYTES,
   GPT_ACTION_DEFAULT_INSPECT_LIMIT,
   sessionAwareRunWorkbenchCommandRequestSchema
-} from '@workbench/shared'
+} from '@mastermind/shared'
 import { containsProtectedRepositoryContent, evaluateConnectedRepositoryPath } from '../../../../../packages/shared/src/workbench-repository-access-policy'
 import { getActionDiagnostics } from '../env-compat'
 
@@ -123,7 +123,7 @@ export function sourceSelectionRequired(sourceId: unknown) {
   if (!PLACEHOLDER_SOURCE_IDS.has(normalized)) return null
   return {
     code: 'SOURCE_SELECTION_REQUIRED',
-    message: `sourceId "${normalized}" is a placeholder, not a configured Workbench source.`,
+    message: `sourceId "${normalized}" is a placeholder, not a configured Mastermind source.`,
     details: 'Use getWorkbenchStatus with include=sources only when the requested repository label cannot be resolved, then retry with the exact enabled ID returned for that repository. Never substitute another repository.',
     recovery: [
       'Call getWorkbenchStatus with include=sources.',
@@ -139,13 +139,13 @@ export async function requireExplicitSourceId(body: Record<string, unknown>, _us
   if (typeof body.sourceId === 'string' && body.sourceId.length > 0) {
     return null
   }
-  return { error: 'Target sourceId is required. Workbench does not fall back to global active context for repo-specific actions because other conversations may change it.', status: 400 }
+  return { error: 'Target sourceId is required. Mastermind does not fall back to global active context for repo-specific actions because other conversations may change it.', status: 400 }
 }
 
 function requireExplicitReadScope(body: Record<string, unknown>) {
   if (typeof body.sourceId === 'string' && body.sourceId.length > 0) return null
   if (Array.isArray(body.sourceIds) && body.sourceIds.length > 0 && body.sourceIds.every(id => typeof id === 'string' && id.length > 0)) return null
-  return { error: 'sourceId or sourceIds is required. Workbench does not use global active context for inspect/read because other conversations may change it.', status: 400 }
+  return { error: 'sourceId or sourceIds is required. Mastermind does not use global active context for inspect/read because other conversations may change it.', status: 400 }
 }
 
 function normalizePath(input: string): string {
@@ -379,20 +379,20 @@ function isDependencyChange(content?: string): boolean {
 function classifyBlockedWrite(path: string, policy?: WritePolicy, content?: string, changeType?: string) {
   const normalized = normalizePath(path)
   if (!normalized) {
-    return { code: 'WRITE_PATH_BLOCKED', message: 'This path is blocked by the source write policy.', userMessage: 'Workbench can read this file, but it needs a valid repo-relative path to write it.', reason: 'empty_path', hint: 'Provide a repo-relative path like docs/README.md.' }
+    return { code: 'WRITE_PATH_BLOCKED', message: 'This path is blocked by the source write policy.', userMessage: 'Mastermind can read this file, but it needs a valid repo-relative path to write it.', reason: 'empty_path', hint: 'Provide a repo-relative path like docs/README.md.' }
   }
   if (normalized.startsWith('..') || normalized.includes('/../') || normalized === '..') {
-    return { code: 'PATH_TRAVERSAL_BLOCKED', message: 'Path traversal outside the repo is blocked.', userMessage: 'Workbench can only write inside the connected source root.', reason: 'path_traversal', hint: 'Use a repo-relative path inside the source root.' }
+    return { code: 'PATH_TRAVERSAL_BLOCKED', message: 'Path traversal outside the repo is blocked.', userMessage: 'Mastermind can only write inside the connected source root.', reason: 'path_traversal', hint: 'Use a repo-relative path inside the source root.' }
   }
   if (path.startsWith('/')) {
-    return { code: 'ABSOLUTE_PATH_BLOCKED', message: 'Absolute paths outside the repo are blocked.', userMessage: 'Workbench can only write inside the connected source root.', reason: 'absolute_path', hint: 'Use a repo-relative path inside the source root.' }
+    return { code: 'ABSOLUTE_PATH_BLOCKED', message: 'Absolute paths outside the repo are blocked.', userMessage: 'Mastermind can only write inside the connected source root.', reason: 'absolute_path', hint: 'Use a repo-relative path inside the source root.' }
   }
   const pathProtection = evaluateConnectedRepositoryPath(path)
   if (pathProtection) {
     return { code: pathProtection.code, message: pathProtection.message, userMessage: pathProtection.message, reason: pathProtection.reason, hint: pathProtection.hint }
   }
   if (typeof content === 'string' && containsProtectedRepositoryContent(content)) {
-    return { code: 'SECRET_PATTERN_BLOCKED', message: 'This content is blocked because it looks like it may contain a secret.', userMessage: 'Workbench will not write content that looks like a token, credential, or private key.', reason: 'blocked_content_pattern', hint: 'Use redacted placeholders such as [REDACTED], <token>, or your-key-here instead.' }
+    return { code: 'SECRET_PATTERN_BLOCKED', message: 'This content is blocked because it looks like it may contain a secret.', userMessage: 'Mastermind will not write content that looks like a token, credential, or private key.', reason: 'blocked_content_pattern', hint: 'Use redacted placeholders such as [REDACTED], <token>, or your-key-here instead.' }
   }
   if (typeof content === 'string' && Array.isArray(policy?.blockedContentPatterns)) {
     const matchedPattern = policy.blockedContentPatterns.find(pattern => typeof pattern === 'string' && pattern.length > 0 && content.includes(pattern))
@@ -400,23 +400,23 @@ function classifyBlockedWrite(path: string, policy?: WritePolicy, content?: stri
       return {
         code: 'SECRET_PATTERN_BLOCKED',
         message: 'This content is blocked because it looks like it may contain a secret.',
-        userMessage: 'Workbench will not write content that looks like a token, credential, or private key.',
+        userMessage: 'Mastermind will not write content that looks like a token, credential, or private key.',
         reason: 'blocked_content_pattern',
         hint: 'Use redacted placeholders such as [REDACTED], <token>, or your-key-here instead.'
       }
     }
   }
   if (matchesAny(policy?.confirmationRequiredGlobs, normalized)) {
-    return { code: 'REQUIRES_EXPLICIT_CONFIRMATION', message: 'This change requires explicit confirmation.', userMessage: 'Workbench needs explicit confirmation before making this change.', reason: 'confirmation_required_path', hint: 'Explicitly confirm before editing lockfiles, GitHub workflows, LICENSE, or Prisma migrations.' }
+    return { code: 'REQUIRES_EXPLICIT_CONFIRMATION', message: 'This change requires explicit confirmation.', userMessage: 'Mastermind needs explicit confirmation before making this change.', reason: 'confirmation_required_path', hint: 'Explicitly confirm before editing lockfiles, GitHub workflows, LICENSE, or Prisma migrations.' }
   }
   if (matchesAny(policy?.protectedWriteGlobs, normalized)) {
-    return { code: 'REQUIRES_EXPLICIT_CONFIRMATION', message: 'This change requires explicit confirmation.', userMessage: 'Workbench needs explicit confirmation before making this change.', reason: 'protected_write_path', hint: 'Explicitly confirm before editing this protected maintenance path.' }
+    return { code: 'REQUIRES_EXPLICIT_CONFIRMATION', message: 'This change requires explicit confirmation.', userMessage: 'Mastermind needs explicit confirmation before making this change.', reason: 'protected_write_path', hint: 'Explicitly confirm before editing this protected maintenance path.' }
   }
   if (matchesAny(policy?.blockedGlobs, normalized)) {
-    return { code: 'SECRET_PATH_BLOCKED', message: 'This path is blocked because it may contain secrets.', userMessage: 'Workbench will not write to secret-like files such as .env or private key paths.', reason: 'blocked_glob', hint: 'Use a docs or project note path instead.' }
+    return { code: 'SECRET_PATH_BLOCKED', message: 'This path is blocked because it may contain secrets.', userMessage: 'Mastermind will not write to secret-like files such as .env or private key paths.', reason: 'blocked_glob', hint: 'Use a docs or project note path instead.' }
   }
   if (matchesAny(policy?.protectedGlobs, normalized)) {
-    return { code: 'PROTECTED_PATH', message: 'This file is protected by policy.', userMessage: 'Workbench is not allowed to write to this protected file.', reason: 'protected_glob', hint: 'Choose a docs path or update the source policy if intentional.' }
+    return { code: 'PROTECTED_PATH', message: 'This file is protected by policy.', userMessage: 'Mastermind is not allowed to write to this protected file.', reason: 'protected_glob', hint: 'Choose a docs path or update the source policy if intentional.' }
   }
   // Repository scope is the authorization boundary; no folder allowlist is evaluated here.
   const allowedRoots = ['**']
@@ -424,7 +424,7 @@ function classifyBlockedWrite(path: string, policy?: WritePolicy, content?: stri
     root === '*.md' ? normalized.endsWith('.md') : root.endsWith('/**') ? normalized === root.slice(0, -3) || normalized.startsWith(root.slice(0, -3) + '/') : normalized === root || normalized.startsWith(`${root}/`)
   ))
   if (false && !allowRoot) {
-    return { code: 'WRITE_PATH_BLOCKED', message: 'This path is blocked by the source write policy.', userMessage: 'Workbench can read this file, but the current write policy blocks changes to this path.', reason: 'path_not_allowed', hint: 'Choose an allowed docs path or update the source write policy.' }
+    return { code: 'WRITE_PATH_BLOCKED', message: 'This path is blocked by the source write policy.', userMessage: 'Mastermind can read this file, but the current write policy blocks changes to this path.', reason: 'path_not_allowed', hint: 'Choose an allowed docs path or update the source write policy.' }
   }
   return null
 }
@@ -572,7 +572,7 @@ async function fetchJson(endpoint: string, init?: RequestInit, transportOptions?
       200,
       buildActionErrorEnvelope({
         code: isAbort ? 'LOCAL_STACK_TIMEOUT' : 'ACTION_TRANSPORT_ERROR',
-        message: isAbort ? 'Workbench local stack timed out.' : 'Backend request failed.',
+        message: isAbort ? 'Mastermind local stack timed out.' : 'Backend request failed.',
         details: isAbort ? `The request to ${endpoint} exceeded ${timeoutMs}ms.` : err instanceof Error ? err.message : String(err),
         status: isAbort ? 'timeout' : 'error',
         diagnostics: {
@@ -592,7 +592,7 @@ async function fetchJson(endpoint: string, init?: RequestInit, transportOptions?
         413,
         buildActionErrorEnvelope({
           code: 'RESPONSE_SIZE_EXCEEDED',
-          message: 'Workbench error response exceeded size limit.',
+          message: 'Mastermind error response exceeded size limit.',
           details: `Error response from ${endpoint} exceeded ${maxResponseBytes} bytes.`,
           status: 'needs_narrower_scope',
           diagnostics: {
@@ -637,7 +637,7 @@ async function fetchJson(endpoint: string, init?: RequestInit, transportOptions?
       413,
       buildActionErrorEnvelope({
         code: 'RESPONSE_SIZE_EXCEEDED',
-        message: 'Workbench response exceeded size limit.',
+        message: 'Mastermind response exceeded size limit.',
         details: `Response from ${endpoint} exceeded ${maxResponseBytes} bytes.`,
         status: 'needs_narrower_scope',
         diagnostics: {
@@ -674,8 +674,8 @@ export function unwrapActionError(err: unknown, fallback: string) {
       return {
         error: buildActionErrorEnvelope({
           code: 'WORKBENCH_AUTH_ERROR',
-          message: 'Workbench authentication failed.',
-          recovery: ['Refresh the Workbench credential.', 'Retry the request after authentication succeeds.'],
+          message: 'Mastermind authentication failed.',
+          recovery: ['Refresh the Mastermind credential.', 'Retry the request after authentication succeeds.'],
           status: 'error',
           connected: true
         }),
@@ -687,8 +687,8 @@ export function unwrapActionError(err: unknown, fallback: string) {
       error: buildActionErrorEnvelope({
         code: err.statusCode >= 500 ? 'WORKBENCH_STATUS_ERROR' : 'ACTION_TRANSPORT_ERROR',
         message: err.statusCode >= 500
-          ? 'Workbench status could not be completed.'
-          : 'Workbench transport failed before a structured response was available.',
+          ? 'Mastermind status could not be completed.'
+          : 'Mastermind transport failed before a structured response was available.',
         details: fallback,
         status: 'error'
       }),
@@ -699,7 +699,7 @@ export function unwrapActionError(err: unknown, fallback: string) {
     error: buildActionErrorEnvelope({
       code: 'WORKBENCH_STATUS_ERROR',
       message: fallback,
-      details: 'Workbench status failed before a safe response could be produced.'
+      details: 'Mastermind status failed before a safe response could be produced.'
     }),
     status: 500
   }
@@ -857,7 +857,7 @@ export async function getWorkbenchActiveContext(userToken?: string, transportOpt
       : resumeStatus === 'SOURCE_SELECTION_REQUIRED'
         ? 'No repository was selected for resume; choose a named repository.'
         : resumeStatus === 'FOCUS_STALE'
-          ? 'The previously focused repository is stale; re-select it in Workbench.'
+          ? 'The previously focused repository is stale; re-select it in Mastermind.'
           : context.activeSourceIds.length > 0
       ? `Active context is ${context.contextMode}-source: ${summaryList(context.activeSourceIds)}.`
       : 'No active source context is selected.',
@@ -1221,8 +1221,8 @@ export async function dispatchWorkbenchCommand(body: Record<string, unknown>, us
     phase: isActiveValidationJob ? 'verifying' : needsConfirmation ? 'waiting_for_confirmation' : status === 'completed' ? 'completed' : 'failed',
     actionLabel: isActiveValidationJob ? 'Tracked long-running validation' : 'Ran safe validation command',
     userMessage: isActiveValidationJob
-      ? `Workbench validation job ${jobId || 'unknown'} is ${status} in ${sourceId}.`
-      : `Workbench ran ${commandKind} in ${sourceId} and finished with ${status}${exitCode !== null ? ` (exit ${exitCode})` : ''}.`,
+      ? `Mastermind validation job ${jobId || 'unknown'} is ${status} in ${sourceId}.`
+      : `Mastermind ran ${commandKind} in ${sourceId} and finished with ${status}${exitCode !== null ? ` (exit ${exitCode})` : ''}.`,
     sourceId,
     riskLevel: 'medium',
     requiresConfirmation: needsConfirmation || resultRecord.requiresConfirmation === true,
@@ -1299,10 +1299,10 @@ export async function dispatchWorkbenchArtifact(body: Record<string, unknown>, u
       phase: isBlocked ? 'blocked' : isNeedsConfirmation ? 'waiting_for_confirmation' : 'preflight',
       actionLabel: isBlocked ? 'Blocked unsafe artifact write' : isNeedsConfirmation ? 'Needs confirmation' : 'Preflighted repo artifact',
       userMessage: isBlocked
-        ? String((result.error as Record<string, unknown>)?.userMessage || 'Workbench blocked this artifact write.')
+        ? String((result.error as Record<string, unknown>)?.userMessage || 'Mastermind blocked this artifact write.')
         : isNeedsConfirmation
-          ? 'Workbench needs confirmation before creating this artifact.'
-          : `Workbench verified that ${artifactPath} is allowed.`,
+          ? 'Mastermind needs confirmation before creating this artifact.'
+          : `Mastermind verified that ${artifactPath} is allowed.`,
       sourceId: typeof result.sourceId === 'string' ? result.sourceId : undefined,
       targetPaths: artifactPath ? [artifactPath] : [],
       changedPaths: [],
@@ -1323,7 +1323,7 @@ export async function dispatchWorkbenchArtifact(body: Record<string, unknown>, u
     operationId: 'writeWorkbenchArtifact',
     phase: 'completed',
     actionLabel: 'Verified repo artifact',
-    userMessage: `Workbench created ${path || 'the artifact'} and verified it on disk.`,
+    userMessage: `Mastermind created ${path || 'the artifact'} and verified it on disk.`,
     sourceId,
     targetPaths: path ? [path] : [],
     changedPaths: path ? [path] : [],
@@ -1358,10 +1358,10 @@ export async function dispatchWorkbenchFileChange(body: Record<string, unknown>,
           ? 'Needs confirmation'
           : 'Preflighted repo file change',
       userMessage: isBlocked
-        ? String((result.error as Record<string, unknown>)?.userMessage || 'Workbench blocked this file change.')
+        ? String((result.error as Record<string, unknown>)?.userMessage || 'Mastermind blocked this file change.')
         : isNeedsConfirmation
-          ? 'Workbench needs confirmation before making this change.'
-          : `Workbench verified that ${typeof result.requestedPath === 'string' ? result.requestedPath : 'this change'} is allowed.`,
+          ? 'Mastermind needs confirmation before making this change.'
+          : `Mastermind verified that ${typeof result.requestedPath === 'string' ? result.requestedPath : 'this change'} is allowed.`,
       sourceId: typeof result.sourceId === 'string' ? result.sourceId : undefined,
       targetPaths: typeof result.normalizedPath === 'string' && result.normalizedPath ? [result.normalizedPath] : [],
       changedPaths: [],
@@ -1392,20 +1392,20 @@ export async function dispatchWorkbenchFileChange(body: Record<string, unknown>,
     return withActivity(result as Record<string, unknown>, makeActivity({
       operationId: 'applyWorkbenchFileChange',
       phase: goalDispatchResult.status === 'blocked' ? 'blocked' : goalDispatchResult.terminalResult?.status === 'completed' ? 'completed' : dispatched ? 'starting' : 'planning',
-      actionLabel: dispatched ? 'Dispatched Workbench goal' : 'Created Workbench run',
+      actionLabel: dispatched ? 'Dispatched Mastermind goal' : 'Created Mastermind run',
       userMessage: goalDispatchResult.status === 'blocked'
-        ? 'Workbench blocked the goal before any repository write.'
+        ? 'Mastermind blocked the goal before any repository write.'
         : dispatched
           ? goalDispatchResult.terminalResult?.status === 'completed'
-            ? 'Workbench completed the dispatched repository goal locally.'
-            : 'Workbench accepted the complete goal and is executing it locally.'
-          : run?.id ? 'Workbench prepared the requested run.' : 'Workbench returned the existing active run.',
+            ? 'Mastermind completed the dispatched repository goal locally.'
+            : 'Mastermind accepted the complete goal and is executing it locally.'
+          : run?.id ? 'Mastermind prepared the requested run.' : 'Mastermind returned the existing active run.',
       sourceId: typeof body.sourceId === 'string' ? body.sourceId : undefined,
       changedPaths: goalDispatchResult.terminalResult?.changedFiles,
       riskLevel: goalDispatchInput?.commit?.enabled ? 'medium' : 'low',
       requiresConfirmation: false,
       verified: goalDispatchResult.status !== 'blocked',
-      nextStep: dispatched ? 'Wait for the durable Workbench result; do not issue per-command Actions.' : run?.activeTask?.title ? `Continue the active task: ${run.activeTask.title}.` : 'Read the active run and continue the persisted goal.'
+      nextStep: dispatched ? 'Wait for the durable Mastermind result; do not issue per-command Actions.' : run?.activeTask?.title ? `Continue the active task: ${run.activeTask.title}.` : 'Read the active run and continue the persisted goal.'
     }))
   }
 
@@ -1418,8 +1418,8 @@ export async function dispatchWorkbenchFileChange(body: Record<string, unknown>,
     return withActivity(result as Record<string, unknown>, makeActivity({
       operationId: 'applyWorkbenchFileChange',
       phase: 'planning',
-      actionLabel: 'Resumed Workbench run',
-      userMessage: run?.id ? `Workbench resumed run ${run.id}.` : 'Workbench resumed the active run.',
+      actionLabel: 'Resumed Mastermind run',
+      userMessage: run?.id ? `Mastermind resumed run ${run.id}.` : 'Mastermind resumed the active run.',
       sourceId: typeof body.sourceId === 'string' ? body.sourceId : undefined,
       riskLevel: 'low',
       requiresConfirmation: false,
@@ -1441,13 +1441,13 @@ export async function dispatchWorkbenchFileChange(body: Record<string, unknown>,
     return withActivity(result as Record<string, unknown>, makeActivity({
       operationId: 'applyWorkbenchFileChange',
       phase: 'completed',
-      actionLabel: 'Closed Workbench run',
-      userMessage: run?.id ? `Workbench closed run ${run.id} as ${run.status || 'completed'}.` : 'Workbench closed the requested run.',
+      actionLabel: 'Closed Mastermind run',
+      userMessage: run?.id ? `Mastermind closed run ${run.id} as ${run.status || 'completed'}.` : 'Mastermind closed the requested run.',
       sourceId: typeof body.sourceId === 'string' ? body.sourceId : undefined,
       riskLevel: 'low',
       requiresConfirmation: false,
       verified: run?.status === 'completed',
-      nextStep: 'The persisted Workbench run is closed.'
+      nextStep: 'The persisted Mastermind run is closed.'
     }))
   }
 
@@ -1460,8 +1460,8 @@ export async function dispatchWorkbenchFileChange(body: Record<string, unknown>,
     return withActivity(result as Record<string, unknown>, makeActivity({
       operationId: 'applyWorkbenchFileChange',
       phase: accepted ? 'preflight' : 'blocked',
-      actionLabel: accepted ? 'Preflighted Workbench packet' : 'Rejected Workbench packet',
-      userMessage: accepted ? 'Workbench accepted the packet preflight without writing files.' : 'Workbench rejected the packet before any write.',
+      actionLabel: accepted ? 'Preflighted Mastermind packet' : 'Rejected Mastermind packet',
+      userMessage: accepted ? 'Mastermind accepted the packet preflight without writing files.' : 'Mastermind rejected the packet before any write.',
       sourceId: typeof body.sourceId === 'string' ? body.sourceId : undefined,
       riskLevel: accepted ? 'low' : 'medium',
       requiresConfirmation: false,
@@ -1488,10 +1488,10 @@ export async function dispatchWorkbenchFileChange(body: Record<string, unknown>,
     return withActivity(result as Record<string, unknown>, makeActivity({
       operationId: 'applyWorkbenchFileChange',
       phase: claimed ? 'planning' : 'blocked',
-      actionLabel: claimed ? 'Claimed Workbench packet lease' : 'Rejected Workbench packet claim',
+      actionLabel: claimed ? 'Claimed Mastermind packet lease' : 'Rejected Mastermind packet claim',
       userMessage: claimed
-        ? `Workbench claimed packet ${record?.packet?.packetId || 'unknown'} with lease owner ${record?.leaseOwner || 'unknown'} expiring at ${record?.leaseExpiresAt || 'unknown'}.`
-        : 'Workbench rejected the packet claim.',
+        ? `Mastermind claimed packet ${record?.packet?.packetId || 'unknown'} with lease owner ${record?.leaseOwner || 'unknown'} expiring at ${record?.leaseExpiresAt || 'unknown'}.`
+        : 'Mastermind rejected the packet claim.',
       sourceId: typeof body.sourceId === 'string' ? body.sourceId : undefined,
       riskLevel: 'medium',
       requiresConfirmation: false,
@@ -1510,8 +1510,8 @@ export async function dispatchWorkbenchFileChange(body: Record<string, unknown>,
     return withActivity(result as Record<string, unknown>, makeActivity({
       operationId: 'applyWorkbenchFileChange',
       phase: ready ? 'preflight' : 'blocked',
-      actionLabel: ready ? 'Planned Workbench packet execution' : 'Rejected Workbench packet plan',
-      userMessage: ready ? 'Workbench produced a deterministic execution plan without writing files.' : 'Workbench rejected the execution plan before any write.',
+      actionLabel: ready ? 'Planned Mastermind packet execution' : 'Rejected Mastermind packet plan',
+      userMessage: ready ? 'Mastermind produced a deterministic execution plan without writing files.' : 'Mastermind rejected the execution plan before any write.',
       sourceId: typeof body.sourceId === 'string' ? body.sourceId : undefined,
       riskLevel: ready ? 'low' : 'medium',
       requiresConfirmation: false,
@@ -1531,8 +1531,8 @@ export async function dispatchWorkbenchFileChange(body: Record<string, unknown>,
     return withActivity(result as Record<string, unknown>, makeActivity({
       operationId: 'applyWorkbenchFileChange',
       phase: completed ? 'completed' : 'failed',
-      actionLabel: completed ? 'Executed Workbench packet' : rolledBack ? 'Rolled back failed Workbench packet' : 'Workbench packet execution failed',
-      userMessage: completed ? 'Workbench executed and verified the leased packet.' : rolledBack ? 'Workbench stopped on failure and restored the packet paths.' : 'Workbench stopped packet execution after a failure.',
+      actionLabel: completed ? 'Executed Mastermind packet' : rolledBack ? 'Rolled back failed Mastermind packet' : 'Mastermind packet execution failed',
+      userMessage: completed ? 'Mastermind executed and verified the leased packet.' : rolledBack ? 'Mastermind stopped on failure and restored the packet paths.' : 'Mastermind stopped packet execution after a failure.',
       sourceId: typeof body.sourceId === 'string' ? body.sourceId : undefined,
       riskLevel: completed ? 'medium' : 'high',
       requiresConfirmation: false,
@@ -1559,7 +1559,7 @@ export async function dispatchWorkbenchFileChange(body: Record<string, unknown>,
       operationId: 'applyWorkbenchFileChange',
       phase: 'completed',
       actionLabel: 'Verified repo file change',
-      userMessage: `Workbench appended to ${path || 'the file'} and verified it on disk.`,
+      userMessage: `Mastermind appended to ${path || 'the file'} and verified it on disk.`,
       sourceId: typeof body.sourceId === 'string' ? body.sourceId : undefined,
       targetPaths: path ? [path] : [],
       changedPaths: path ? [path] : [],
@@ -1581,7 +1581,7 @@ export async function dispatchWorkbenchFileChange(body: Record<string, unknown>,
       operationId: 'applyWorkbenchFileChange',
       phase: 'completed',
       actionLabel: 'Verified repo file change',
-      userMessage: `Workbench created ${path || 'the file'} and verified it on disk.`,
+      userMessage: `Mastermind created ${path || 'the file'} and verified it on disk.`,
       sourceId: typeof body.sourceId === 'string' ? body.sourceId : undefined,
       targetPaths: path ? [path] : [],
       changedPaths: path ? [path] : [],
@@ -1603,7 +1603,7 @@ export async function dispatchWorkbenchFileChange(body: Record<string, unknown>,
       operationId: 'applyWorkbenchFileChange',
       phase: 'completed',
       actionLabel: 'Verified repo file change',
-      userMessage: `Workbench overwrote ${path || 'the file'} and verified it on disk.`,
+      userMessage: `Mastermind overwrote ${path || 'the file'} and verified it on disk.`,
       sourceId: typeof body.sourceId === 'string' ? body.sourceId : undefined,
       targetPaths: path ? [path] : [],
       changedPaths: path ? [path] : [],
@@ -1626,7 +1626,7 @@ export async function dispatchWorkbenchFileChange(body: Record<string, unknown>,
       operationId: 'applyWorkbenchFileChange',
       phase: 'completed',
       actionLabel: 'Verified repo file change',
-      userMessage: `Workbench patched ${path || 'the file'} and verified it on disk.`,
+      userMessage: `Mastermind patched ${path || 'the file'} and verified it on disk.`,
       sourceId: typeof body.sourceId === 'string' ? body.sourceId : undefined,
       targetPaths: path ? [path] : [],
       changedPaths: path ? [path] : [],
@@ -1653,10 +1653,10 @@ export async function dispatchWorkbenchFileChange(body: Record<string, unknown>,
           ? 'Deleted directory'
           : 'Deleted file',
       userMessage: changeType === 'rmdir'
-        ? `Workbench deleted the empty directory ${deletedPath || 'target'} and verified it on disk.`
+        ? `Mastermind deleted the empty directory ${deletedPath || 'target'} and verified it on disk.`
         : changeType === 'delete_directory'
-          ? `Workbench deleted ${deletedPath || 'the directory'} and verified it on disk.`
-          : `Workbench deleted ${deletedPath || 'the file'} and verified it on disk.`,
+          ? `Mastermind deleted ${deletedPath || 'the directory'} and verified it on disk.`
+          : `Mastermind deleted ${deletedPath || 'the file'} and verified it on disk.`,
       sourceId: typeof body.sourceId === 'string' ? body.sourceId : undefined,
       targetPaths: deletedPath ? [deletedPath] : [],
       changedPaths: deletedPath ? [deletedPath] : [],
@@ -1680,7 +1680,7 @@ export async function dispatchWorkbenchFileChange(body: Record<string, unknown>,
       operationId: 'applyWorkbenchFileChange',
       phase: 'completed',
       actionLabel: changeType === 'rename' ? 'Renamed repo file' : 'Moved repo file',
-      userMessage: `${changeType === 'rename' ? 'Workbench renamed' : 'Workbench moved'} ${from || 'the file'}${to ? ` to ${to}` : ''} and verified it on disk.`,
+      userMessage: `${changeType === 'rename' ? 'Mastermind renamed' : 'Mastermind moved'} ${from || 'the file'}${to ? ` to ${to}` : ''} and verified it on disk.`,
       sourceId: typeof body.sourceId === 'string' ? body.sourceId : undefined,
       targetPaths: [from, to].filter((path): path is string => typeof path === 'string' && path.length > 0),
       changedPaths: [from, to].filter((path): path is string => typeof path === 'string' && path.length > 0),
@@ -1700,7 +1700,7 @@ export async function dispatchWorkbenchFileChange(body: Record<string, unknown>,
       operationId: 'applyWorkbenchFileChange',
       phase: 'completed',
       actionLabel: 'Created directory',
-      userMessage: `Workbench created ${path || 'the directory'} and verified it on disk.`,
+      userMessage: `Mastermind created ${path || 'the directory'} and verified it on disk.`,
       sourceId: typeof body.sourceId === 'string' ? body.sourceId : undefined,
       targetPaths: path ? [path] : [],
       changedPaths: path ? [path] : [],

@@ -1,5 +1,5 @@
 import { Ajv, type ValidateFunction } from 'ajv'
-import { evaluateAutonomyPolicy, type AutonomyPolicyLayer } from '@workbench/shared'
+import { evaluateAutonomyPolicy, type AutonomyPolicyLayer } from '@mastermind/shared'
 
 export const WORKBENCH_GRANT_CONTRACT_VERSION = '1' as const
 export const WORKBENCH_GRANT_KIND = 'workbench.workspace.grant' as const

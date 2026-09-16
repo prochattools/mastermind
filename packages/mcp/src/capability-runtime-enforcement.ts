@@ -9,7 +9,7 @@ import {
   type CapabilityJsonSchema,
   type CapabilityManifest,
   type CapabilityNetworkMethod
-} from '@workbench/shared'
+} from '@mastermind/shared'
 import { validateCapabilityBeforeExecution, type ExecutionValidationState } from './capability-pre-execution.js'
 import type { CapabilityGrantSnapshot, CapabilityPlan } from './capability-planning.js'
 import type { CapabilityJobEvidence, CapabilityJobHandlerResult, CapabilityJobIdentity } from './capability-execution-coordinator.js'

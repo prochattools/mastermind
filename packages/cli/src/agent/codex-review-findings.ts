@@ -1,13 +1,13 @@
 import crypto from 'node:crypto'
 import fs from 'node:fs'
 import path from 'node:path'
-import { evaluateConnectedRepositoryPath, workbenchEvidenceIdSchema } from '@workbench/shared'
+import { evaluateConnectedRepositoryPath, workbenchEvidenceIdSchema } from '@mastermind/shared'
 import {
   appendWorkbenchEvidence,
   readWorkbenchEvidence,
   type WorkbenchEvidenceStoreOptions
 } from './workbench-evidence-store'
-import type { WorkbenchEvidenceRecord } from '@workbench/shared'
+import type { WorkbenchEvidenceRecord } from '@mastermind/shared'
 import {
   getCodexReviewExecutionRecord,
   type CodexReviewExecutionStoreOptions

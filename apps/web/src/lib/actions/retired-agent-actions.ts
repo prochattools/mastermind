@@ -14,7 +14,7 @@ export function retiredAgentAction(operationId: string) {
     error: {
       code: 'WORKBENCH_AGENT_ACTION_RETIRED',
       message: 'This Agent Mode GPT action route has been retired.',
-      details: `${operationId} is not part of the current Workbench Custom GPT action contract.`,
+      details: `${operationId} is not part of the current Mastermind Custom GPT action contract.`,
       recovery
     },
     activity: {
@@ -25,7 +25,7 @@ export function retiredAgentAction(operationId: string) {
       riskLevel: 'low',
       requiresConfirmation: false,
       verified: true,
-      nextStep: 'Update the GPT schema and retry with the current five Workbench actions.'
+      nextStep: 'Update the GPT schema and retry with the current five Custom GPT actions.'
     }
   }, {
     status: 200,

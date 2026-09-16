@@ -14,7 +14,7 @@ import { reconcileIndexStateFromDocs, flushIndexStateOnShutdown } from './index-
 import { collectIndexQueueDiagnostics } from './index-queue-observability'
 import { listWorkspaceTree, grepWorkspace, getWorkspaceInfo, resolveWorkspacePath, validateWorkspacePath } from './workspace'
 import { getResolvedActiveSources, isAllowedArtifactRoot, isAllowedSafeWriteRoot, isBlockedWritePath, redactSecrets, resolveTargetSourceId, resolveWithinSource, shouldIncludeEntry, truncateContent, getDefaultWritePolicy, resolveSourceWritePolicy, validateWriteTarget, normalizeRepoRelativePath } from './safe-access'
-import { resolveResumeNavigation, type Workspace } from '@workbench/shared'
+import { resolveResumeNavigation, type Workspace } from '@mastermind/shared'
 import { buildArtifactFilename, normalizeArtifactSlug, verifyWrittenFile } from './write-verification'
 import { getAllowedCommandKinds, runSafeCommand, type SafeCommandKind } from './command-runner'
 import { compactAgentJob, controlAgentJob, createWorkbenchRun, getActiveWorkbenchRun, getAgentJob, listActiveWorkbenchRuns, listAgentJobs, resumeWorkbenchRun, startAgentJob, updateAgentJob, type AgentJobControlAction, type WorkbenchGoalContext } from './agent-jobs'
@@ -38,7 +38,7 @@ import { claimNextWorkbenchPacket, compactWorkbenchPacketLeaseRecord, controlWor
 import { dispatchWorkbenchGoal, getWorkbenchGoalTerminalResult, type WorkbenchGoalDispatchInput } from './workbench-goal-dispatch'
 import { compileNativeGoal, validateNativeGoalPaths } from './native-goal-compiler'
 import { projectCodexProviderStatus } from './codex-provider-status'
-import { getBuildSha, getBuildTimestamp } from '@workbench/shared'
+import { getBuildSha, getBuildTimestamp } from '@mastermind/shared'
 import { initializeCapabilityRuntime, scheduleCapabilityRuntimeMaintenance } from '../../../mcp/dist/capability-runtime-bootstrap.js'
 import { initializeKnowledgeContextRuntime } from '../../../mcp/dist/knowledge-context-runtime.js'
 import { getProviderRuntimeProjection } from '../../../mcp/dist/provider-onboarding.js'
@@ -130,12 +130,13 @@ export async function startLocalServer(port: number = 3052): Promise<void> {
   if (sessionPrune.ok && sessionPrune.deleted > 0) console.log(`[Workbench lifecycle] Pruned ${sessionPrune.deleted} stale session record(s).`)
   if (evidencePrune.ok && evidencePrune.deleted > 0) console.log(`[Workbench lifecycle] Pruned ${evidencePrune.deleted} expendable evidence record(s).`)
   if (readRecoveryPrune.ok && readRecoveryPrune.deleted > 0) console.log(`[Workbench lifecycle] Pruned ${readRecoveryPrune.deleted} stale read-recovery record(s).`)
-  const capabilityRuntimeStatus = initializeCapabilityRuntime({ adapters: [], rootDir: process.env.WORKBENCH_PROVIDER_STATE_DIR })
+  const providerStateDir = process.env.MASTERMIND_PROVIDER_STATE_DIR || process.env.WORKBENCH_PROVIDER_STATE_DIR
+  const capabilityRuntimeStatus = initializeCapabilityRuntime({ adapters: [], rootDir: providerStateDir })
   if (!capabilityRuntimeStatus.initialized) console.error(`[Capability runtime] Startup recovery failed safely: ${capabilityRuntimeStatus.maintenanceError || 'unknown error'}`)
-  const capabilityRuntimeMaintenance = scheduleCapabilityRuntimeMaintenance({ adapters: [], rootDir: process.env.WORKBENCH_PROVIDER_STATE_DIR }, capabilityRuntimeStatus)
-  const activeProviderResolution = resolveActiveProviders({ rootDir: process.env.WORKBENCH_PROVIDER_STATE_DIR, knowledgeRootDir: process.env.WORKBENCH_PROVIDER_STATE_DIR })
-  const knowledgeContextRuntimePromise = initializeKnowledgeContextRuntime({ registry: { rootDir: process.env.WORKBENCH_PROVIDER_STATE_DIR }, indexRootDir: process.env.WORKBENCH_PROVIDER_STATE_DIR, ...(activeProviderResolution.ok ? { activeProviderIds: activeProviderResolution.value } : {}) })
-  const providerRuntimeProjection = getProviderRuntimeProjection({ rootDir: process.env.WORKBENCH_PROVIDER_STATE_DIR, knowledgeRegistry: { rootDir: process.env.WORKBENCH_PROVIDER_STATE_DIR }, authorizedBy: 'runtime' })
+  const capabilityRuntimeMaintenance = scheduleCapabilityRuntimeMaintenance({ adapters: [], rootDir: providerStateDir }, capabilityRuntimeStatus)
+  const activeProviderResolution = resolveActiveProviders({ rootDir: providerStateDir, knowledgeRootDir: providerStateDir })
+  const knowledgeContextRuntimePromise = initializeKnowledgeContextRuntime({ registry: { rootDir: providerStateDir }, indexRootDir: providerStateDir, ...(activeProviderResolution.ok ? { activeProviderIds: activeProviderResolution.value } : {}) })
+  const providerRuntimeProjection = getProviderRuntimeProjection({ rootDir: providerStateDir, knowledgeRegistry: { rootDir: providerStateDir }, authorizedBy: 'runtime' })
   if (!providerRuntimeProjection.ok) console.error(`[Provider runtime] Startup discovery failed safely: ${'message' in providerRuntimeProjection ? providerRuntimeProjection.message : 'unknown error'}`)
   const workspaceProviderRuntime = loadConfiguredProviderRuntime()
   if (!workspaceProviderRuntime.ok) console.error(`[Workspace configuration] Loading failed safely: ${'message' in workspaceProviderRuntime ? workspaceProviderRuntime.message : 'unknown error'}`)

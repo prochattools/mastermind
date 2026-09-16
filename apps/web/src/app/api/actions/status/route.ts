@@ -10,7 +10,7 @@ import { GPT_ACTION_DEADLINES_MS, withGptActionDeadline } from '@/lib/actions/de
 import { getBuildSha, getBuildTimestamp } from '@/lib/env-compat'
 import { recordRuntimeResourceTelemetry } from '@/lib/actions/runtime-tunnel-telemetry'
 import { readCompactSloHealth, recordCompactStatusSloTelemetry } from '@/lib/actions/slo-health'
-import { projectActiveRunContinuity, resolveResumeSourceSelection } from '@workbench/shared'
+import { projectActiveRunContinuity, resolveResumeSourceSelection } from '@mastermind/shared'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -57,7 +57,7 @@ export async function GET(request: NextRequest) {
       operationId: 'getWorkbenchStatus',
       route: '/api/actions/status',
       deadlineMs: GPT_ACTION_DEADLINES_MS.status,
-      suggestedNextAction: 'Retry status after checking the local BuildFlow stack.'
+      suggestedNextAction: 'Retry status after checking the local Mastermind stack.'
     }, async (deadline) => {
       deadline.setPhase('authenticate')
       const auth = checkActionAuth(request)
@@ -197,8 +197,8 @@ export async function GET(request: NextRequest) {
         version: WEB_PACKAGE_VERSION,
         operationId: 'getWorkbenchStatus',
         phase: 'completed',
-        actionLabel: 'Checked BuildFlow status',
-        userMessage: validInclude ? `BuildFlow status OK (${include} included).` : 'BuildFlow is connected.',
+        actionLabel: 'Checked Mastermind status',
+        userMessage: validInclude ? `Mastermind status OK (${include} included).` : 'Mastermind is connected.',
         riskLevel: 'low',
         requiresConfirmation: false,
         verified: true,
@@ -219,18 +219,18 @@ export async function GET(request: NextRequest) {
           error: {
             code: 'STATUS_PAYLOAD_EXCEEDS_BUDGET',
             message: `Status payload exceeds ${STATUS_RESPONSE_BUDGET_BYTES} bytes (was ${payloadBytes} bytes)`,
-            recovery: ['Retry with fewer sources', 'Use a narrower include parameter', 'Check local BuildFlow logs']
+            recovery: ['Retry with fewer sources', 'Use a narrower include parameter', 'Check local Mastermind logs']
           },
           activity: {
             version: WEB_PACKAGE_VERSION,
             operationId: 'getWorkbenchStatus',
             phase: 'failed',
-            actionLabel: 'BuildFlow status check failed',
-            userMessage: 'Status response was too large; check local BuildFlow for issues.',
+            actionLabel: 'Mastermind status check failed',
+            userMessage: 'Status response was too large; check local Mastermind for issues.',
             riskLevel: 'low',
             requiresConfirmation: false,
             verified: false,
-            nextStep: 'Retry status after investigating BuildFlow logs.'
+            nextStep: 'Retry status after investigating Mastermind logs.'
           }
         }, { status: 200, headers: { 'Cache-Control': 'no-store', 'Content-Type': 'application/json' } })
       }

@@ -8,7 +8,7 @@ import {
   validationNodeExecutionKey,
   type ValidationPlanNode,
   type ValidationPlanV1
-} from '@workbench/shared'
+} from '@mastermind/shared'
 import { getConfigDir } from '../utils/paths'
 import {
   acquireWorkbenchAdmission,

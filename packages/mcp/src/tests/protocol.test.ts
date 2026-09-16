@@ -10,7 +10,7 @@ import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js'
 import { createWorkbenchMcpServer } from '../mcp-server.js'
 import { loadWorkbenchMcpScope } from '../scope.js'
 import { CLIENT_WORKFLOW_TOOL_NAMES } from '../client-workflow-tools.js'
-import { PERSISTED_VALIDATION_COMMAND_KINDS, RUN_WORKBENCH_DIRECT_COMMAND_KINDS, sessionAwareRunWorkbenchCommandRequestSchema } from '@workbench/shared'
+import { PERSISTED_VALIDATION_COMMAND_KINDS, RUN_WORKBENCH_DIRECT_COMMAND_KINDS, sessionAwareRunWorkbenchCommandRequestSchema } from '@mastermind/shared'
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../../..')
 const sessionCommand = (command: Record<string, unknown>) => ({

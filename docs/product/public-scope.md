@@ -1,10 +1,10 @@
-# ProChat Workbench Local Public Scope
+# ProChat Mastermind Local Public Scope
 
-This repo is for ProChat Workbench Local only. BuildFlow remains the technical engine and compatibility name inside the local stack.
+This repo is for ProChat Mastermind Local only. Workbench and BuildFlow remain technical compatibility names inside the local stack until the approved cutover. The live endpoint remains `https://workbench.prochat.tools`; the final target is `https://mastermind.prochat.tools`.
 
 Allowed in this repo:
 
-- local-first Workbench dashboard
+- local-first Mastermind dashboard
 - local agent on the user's machine
 - local relay only when needed for local/Custom GPT connectivity
 - user-owned endpoint, tunnel, and domain guidance
@@ -28,7 +28,7 @@ Allowed in this repo:
 
 Not allowed in this repo:
 
-- Workbench Managed planning
+- Mastermind Managed planning
 - SaaS roadmap
 - paid, Pro, or commercial feature planning
 - billing, pricing, subscription, or account docs
@@ -39,4 +39,4 @@ Not allowed in this repo:
 - commercial production hosting plans
 - private roadmap or go-to-market strategy
 
-The public repo should stay Workbench Local only and should not explain the private product roadmap.
+The public repo should stay Mastermind Local only and should not explain the private product roadmap.

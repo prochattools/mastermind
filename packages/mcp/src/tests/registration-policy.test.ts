@@ -3,7 +3,7 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import test from 'node:test'
-import { installWorkbenchOwnerConfig } from '@workbench/shared/workbench-owner-config'
+import { installWorkbenchOwnerConfig } from '@mastermind/shared/workbench-owner-config'
 import {
   WORKBENCH_MCP_ADAPTER_CONTRACT_VERSION,
   createWorkbenchMcpAdapterResult,

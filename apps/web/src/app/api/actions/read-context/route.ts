@@ -37,8 +37,8 @@ function withReadActivity(data: unknown, params: { mode: string; sourceId?: stri
       phase: 'completed',
       actionLabel: 'Read focused repo context',
       userMessage: target
-        ? `Workbench completed ${params.mode} for ${target}.`
-        : `Workbench completed ${params.mode}.`,
+        ? `Mastermind completed ${params.mode} for ${target}.`
+        : `Mastermind completed ${params.mode}.`,
       sourceId: params.sourceId,
       readPaths: params.paths || (params.path ? [params.path] : undefined),
       riskLevel: 'low',
@@ -74,7 +74,7 @@ function isBroadUnscopedQuery(query: unknown): boolean {
 function needsNarrowerScope(params: { sourceId?: string; mode: string; query?: unknown; paths?: unknown; path?: unknown }) {
   return buildActionErrorEnvelope({
     code: 'WORKBENCH_NEEDS_NARROWER_SCOPE',
-    message: 'Workbench needs a narrower read request before it can respond quickly.',
+    message: 'Mastermind needs a narrower read request before it can respond quickly.',
     details: 'Broad unscoped searches and large reads are refused at the GPT boundary to prevent action timeouts.',
     recovery: [
       'Use grep_context with a specific path and pattern.',
@@ -156,7 +156,7 @@ export async function POST(request: NextRequest) {
       if (!sizeCheck.ok) {
         return NextResponse.json(buildActionErrorEnvelope({
           code: 'WORKBENCH_RESPONSE_SIZE_EXCEEDED',
-          message: 'BuildFlow response exceeded action size budget.',
+          message: 'Mastermind response exceeded action size budget.',
           details: `Response was ${sizeCheck.bytes} bytes, limit is ${READ_CONTEXT_RESPONSE_BUDGET_BYTES} bytes.`,
           recovery: ['Use grep_context with a more specific pattern', 'Use read_range on a specific file', 'Reduce the limit parameter'],
           status: 'needs_narrower_scope',
@@ -176,7 +176,7 @@ export async function POST(request: NextRequest) {
       if (!sizeCheck.ok) {
         return NextResponse.json(buildActionErrorEnvelope({
           code: 'WORKBENCH_RESPONSE_SIZE_EXCEEDED',
-          message: 'Workbench active-run response exceeded action size budget.',
+          message: 'Mastermind active-run response exceeded action size budget.',
           details: `Response was ${sizeCheck.bytes} bytes.`,
           recovery: ['Read the persisted run handoff directly', 'Reduce stored resume details'],
           status: 'needs_narrower_scope'
@@ -197,7 +197,7 @@ export async function POST(request: NextRequest) {
       if (!sizeCheck.ok) {
         return NextResponse.json(buildActionErrorEnvelope({
           code: 'WORKBENCH_RESPONSE_SIZE_EXCEEDED',
-          message: 'BuildFlow graph response exceeded action size budget.',
+          message: 'Mastermind graph response exceeded action size budget.',
           details: `Response was ${sizeCheck.bytes} bytes.`,
           recovery: ['Use a narrower query', 'Reduce the limit', 'Use grep_context instead'],
           status: 'needs_narrower_scope'
@@ -219,7 +219,7 @@ export async function POST(request: NextRequest) {
       if (!sizeCheck.ok) {
         return NextResponse.json(buildActionErrorEnvelope({
           code: 'WORKBENCH_RESPONSE_SIZE_EXCEEDED',
-          message: 'BuildFlow focused read response exceeded action size budget.',
+          message: 'Mastermind focused read response exceeded action size budget.',
           details: `Response was ${sizeCheck.bytes} bytes.`,
           recovery: [`Reduce the line context (before/after)`, `Reduce maxMatches`, 'Use read_range with a smaller line range'],
           status: 'needs_narrower_scope'
@@ -244,7 +244,7 @@ export async function POST(request: NextRequest) {
       if (!sizeCheck.ok) {
         return NextResponse.json(buildActionErrorEnvelope({
           code: 'WORKBENCH_RESPONSE_SIZE_EXCEEDED',
-          message: 'BuildFlow search_and_read response exceeded action size budget.',
+          message: 'Mastermind search_and_read response exceeded action size budget.',
           details: `Response was ${sizeCheck.bytes} bytes.`,
           recovery: ['Use grep_context with a more specific pattern', 'Check if the file is too large for exact reading'],
           status: 'needs_narrower_scope'
@@ -260,7 +260,7 @@ export async function POST(request: NextRequest) {
     if (!sizeCheck.ok) {
       return NextResponse.json(buildActionErrorEnvelope({
         code: 'WORKBENCH_RESPONSE_SIZE_EXCEEDED',
-        message: 'BuildFlow read response exceeded action size budget.',
+        message: 'Mastermind read response exceeded action size budget.',
         details: `Response was ${sizeCheck.bytes} bytes, limit is ${mode === 'prepare_task_context' ? PREPARED_CONTEXT_RESPONSE_BUDGET_BYTES : READ_CONTEXT_RESPONSE_BUDGET_BYTES} bytes.`,
         recovery: ['Use a narrower read mode', 'Reduce the number of paths', 'Use grep_context instead'],
         status: 'needs_narrower_scope'

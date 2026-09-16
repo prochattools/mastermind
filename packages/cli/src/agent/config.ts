@@ -3,7 +3,7 @@ import path from 'path'
 import crypto from 'crypto'
 import { execFileSync } from 'child_process'
 import { getConfigPath, expandTilde } from '../utils/paths'
-import type { Workspace, KnowledgeSource, ActiveSourcesMode, WriteMode, DiscoveredRepository, SourceDiscoverySettings, SourceDiscoveryTelemetry } from '@workbench/shared'
+import type { Workspace, KnowledgeSource, ActiveSourcesMode, WriteMode, DiscoveredRepository, SourceDiscoverySettings, SourceDiscoveryTelemetry } from '@mastermind/shared'
 import { getIndexRecord, upsertIndexState, type SourceIndexStatus } from './index-state'
 import { INDEX_SCAN_EXCLUSION_VERSION, INDEX_SCAN_POLICY_ID, INDEX_SCAN_POLICY_VERSION, type IndexScanFailureCode } from './index-scan-policy'
 

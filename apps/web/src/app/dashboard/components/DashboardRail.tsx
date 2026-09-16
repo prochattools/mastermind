@@ -1,4 +1,4 @@
-import type { KnowledgeSource } from '@workbench/shared'
+import type { KnowledgeSource } from '@mastermind/shared'
 import { Activity, Database, GitBranch, LayoutDashboard, ListChecks, Settings } from 'lucide-react'
 import { getSourceIndexStatusLabel } from '../helpers'
 import { DashboardListRow } from './ui/DashboardListRow'
@@ -41,7 +41,7 @@ export function DashboardRail({
             BF
           </div>
           <div className="min-w-0">
-            <div className="text-[13px] font-semibold text-bf-text dark:text-slate-50">BuildFlow Local</div>
+            <div className="text-[13px] font-semibold text-bf-text dark:text-slate-50">Mastermind</div>
             <div className="text-[11px] text-bf-muted dark:text-slate-400">Local repo workbench</div>
           </div>
         </div>

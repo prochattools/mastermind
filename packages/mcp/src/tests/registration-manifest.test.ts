@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { RUN_WORKBENCH_DIRECT_COMMAND_KINDS } from '@workbench/shared'
+import { RUN_WORKBENCH_DIRECT_COMMAND_KINDS } from '@mastermind/shared'
 import { WORKBENCH_TOOL_NAMES } from '../contracts.js'
 import {
   WORKBENCH_MCP_REGISTRATION_API_VERSION,

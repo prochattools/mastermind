@@ -1,4 +1,4 @@
-import type { KnowledgeSource, ActiveSourcesMode, WriteMode } from '@workbench/shared'
+import type { KnowledgeSource, ActiveSourcesMode, WriteMode } from '@mastermind/shared'
 
 export type DashboardSection = 'overview' | 'sources' | 'activity' | 'plan' | 'handoff' | 'settings'
 

@@ -1,6 +1,6 @@
 import fs from 'fs'
 import path from 'path'
-import type { IndexedDoc } from '@workbench/shared'
+import type { IndexedDoc } from '@mastermind/shared'
 import { getConfigDir } from '../utils/paths'
 import type { IndexScanFailureCode } from './index-scan-policy'
 

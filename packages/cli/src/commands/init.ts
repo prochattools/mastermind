@@ -4,7 +4,7 @@ import { saveConfig } from '../agent/config'
 import { getConfigDir } from '../utils/paths'
 import { log } from '../utils/logger'
 import os from 'os'
-import { getApiBaseUrl } from '@workbench/shared'
+import { getApiBaseUrl } from '@mastermind/shared'
 
 export async function initCommand(): Promise<void> {
   const configDir = getConfigDir()

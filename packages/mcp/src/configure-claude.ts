@@ -4,8 +4,8 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { deriveWorkbenchMcpCredential } from '@workbench/shared/workbench-mcp-auth'
-import { loadWorkbenchOwnerConfig } from '@workbench/shared/workbench-owner-config'
+import { deriveWorkbenchMcpCredential } from '@mastermind/shared/workbench-mcp-auth'
+import { loadWorkbenchOwnerConfig } from '@mastermind/shared/workbench-owner-config'
 import {
   WORKBENCH_MCP_PROFILES,
   WORKBENCH_CREDENTIAL_FILE_NAME,

@@ -9,7 +9,7 @@ import {
   type WorkbenchActivityProgress,
   type WorkbenchActivityProjection,
   type WorkbenchActivityTelemetry
-} from '@workbench/shared'
+} from '@mastermind/shared'
 import { getConfigDir } from '../utils/paths'
 import { GPT_ACTION_TARGET_BYTES, measureJsonPayload } from './payload-budget'
 import { redactSecrets } from './safe-access'

@@ -8,7 +8,7 @@ import {
   type AutonomyDecisionRequest,
   type PersistedAutonomyDecision,
   type PersistedAutonomyDecisionValue
-} from '@workbench/shared'
+} from '@mastermind/shared'
 import { getConfigDir } from '../utils/paths'
 
 export const WORKBENCH_AUTONOMY_DECISION_STORE_VERSION = 1 as const

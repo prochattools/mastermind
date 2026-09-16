@@ -4,7 +4,7 @@ import {
   createAutonomyDecisionRequest,
   createAutonomyPolicyBinding,
   type AutonomyDecisionRequest
-} from '@workbench/shared'
+} from '@mastermind/shared'
 import {
   lookupAutonomyDecision,
   type AutonomyDecisionLookup,

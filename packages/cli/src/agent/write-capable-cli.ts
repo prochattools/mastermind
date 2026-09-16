@@ -6,7 +6,7 @@ import {
 import { CapabilityBroker, type CapabilityBrokerResult } from '../../../mcp/dist/capability-broker.js'
 import type { CapabilityJobHandler, CapabilityJobHandlerResult, CapabilityJobProjection } from '../../../mcp/dist/capability-execution-coordinator.js'
 import type { CapabilityRuntimeIdentity, CapabilityPhase16Context } from '../../../mcp/dist/capability-runtime-enforcement.js'
-import type { CliCapabilityManifest, AutonomyDecisionEvidenceReference, AutonomyPermissionCategory, AutonomyPolicyEvaluationInput } from '@workbench/shared'
+import type { CliCapabilityManifest, AutonomyDecisionEvidenceReference, AutonomyPermissionCategory, AutonomyPolicyEvaluationInput } from '@mastermind/shared'
 import {
   buildAutonomyDecisionPolicyInput,
   prepareAutonomyDecisionAuthorization,

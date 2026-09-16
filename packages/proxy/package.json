@@ -1,9 +1,9 @@
 {
-  "name": "@workbench/proxy",
+  "name": "@mastermind/proxy",
   "version": "0.1.0",
   "private": true,
   "license": "AGPL-3.0-only",
-  "description": "BuildFlow production proxy - routes to relay and web",
+  "description": "Mastermind production proxy - routes to relay and web",
   "main": "dist/index.js",
   "scripts": {
     "build": "tsc",

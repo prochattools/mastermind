@@ -5,8 +5,8 @@ import path from 'node:path'
 import test from 'node:test'
 import { parse } from 'smol-toml'
 import { configureCodex, inspectCodexRegistration, parseProjectRootArgument, parseConfigureCliArgs, BRAIN_PROFILE_ALLOWED_TOOLS, BRAIN_PROFILE_ALLOWED_COMMAND_KINDS, PROFILE_AVAILABILITY } from '../configure-codex.js'
-import { installWorkbenchOwnerConfig } from '@workbench/shared/workbench-owner-config'
-import { deriveWorkbenchMcpCredential } from '@workbench/shared/workbench-mcp-auth'
+import { installWorkbenchOwnerConfig } from '@mastermind/shared/workbench-owner-config'
+import { deriveWorkbenchMcpCredential } from '@mastermind/shared/workbench-mcp-auth'
 
 function fixture() {
   const root = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'workbench-mcp-config-')))
