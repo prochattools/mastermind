@@ -1,37 +1,21 @@
-# ProChat Mastermind Local Feature Scope
+# Mastermind Local feature scope
 
-Current and planned Mastermind Local features:
+The current public beta supports these local-first capabilities:
 
-- source management
-- branch-aware grouping for configured Git checkouts and linked worktrees
-- local indexing
-- bounded source/provider health diagnostics
-- owner-approved reconciliation proposals with fail-closed handling for
-  ambiguous, active, dirty, and managed registrations
-- exact reviewed-set recovery with one approval, per-registration revalidation,
-  safe stale-item skipping, and explicit partial results
-- dashboard active context
-- explicit-source Custom GPT actions
-- strict source locking with placeholder-source rejection
-- safe write mode
-- local dashboard
-- local activity
-- dynamic handoff prompts
-- ChatGPT-first structured action responses
-- local activity/event history
-- local handoff objects and links
-- optional confirmed local runner
-- bounded direct `rg` execution with regex alternation and `shell:false`
-- projected command evidence (`executable`, argv, match status, repository and path-change evidence)
-- confirmation-gated fixed Brain `n8n_workflow_export`
-- syntax-aware network/security scanning for JavaScript and TypeScript
-- local plans and tasks
-- Custom GPT and OpenAPI setup with a user-owned endpoint
-- verification and test scripts
-- local onboarding
-- native Settings installation/update UX with explicit approval and
-  controller-owned promotion, restart, health verification, and rollback
-- local docs and contribution flow
+- source management and explicit source locking
+- branch-aware grouping for configured Git checkouts and worktrees
+- local indexing, bounded search, and task-context preparation
+- source/provider health diagnostics and owner-approved reconciliation
+- exact reviewed-set recovery with independent revalidation and partial results
+- guarded file changes with dry runs and write verification
+- bounded `rg` and repository command evidence
+- confirmation-gated operations and secret/path redaction
+- validation jobs with persisted result references
+- exact-path Git commits with no default push
+- local activity, plans, tasks, and durable goal state
+- Custom GPT integration through the five canonical actions
+- native macOS settings, helper, ingress, status, and doctor surfaces
+- local docs, verification scripts, and contribution flow
 
-This list is for Mastermind Local only.
-It does not include paid, hosted, SaaS, Pro, managed, commercial, billing, account, team, or private roadmap items.
+This scope describes Mastermind Local only. It is not a promise of unrestricted
+autonomy or a hosted multi-user runtime.

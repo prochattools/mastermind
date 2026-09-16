@@ -68,20 +68,18 @@ bounded filesystem fallback evidence when indexing is unavailable.
 
 ## Source Lock and Activation
 
-For repository/content requests normalize labels and lock the unique sourceId.
-The canonical private source is `prochattools-mastermind`. The legacy
-`Workbench Private` label and its hyphenated form resolve to that source as
-compatibility aliases; when known, call readMastermindContext directly, even
-fresh.
+For repository/content requests normalize labels and lock one unique enabled
+sourceId. The source ID is configuration-specific and must be discovered when
+unknown; never expose internal IDs or infer one from a label.
 
 Reuse a known/locked sourceId without rediscovery/status. If unknown, discover
 once with getMastermindStatus when allowed; otherwise report the blocker. Ask
 if ambiguous. Never guess between matches or substitute sources; never expose internal IDs.
 
 “Activate Mastermind” discovers repositories. Legacy “Activate Workbench” is
-also a temporary trigger. “Activate <name>” matches after normalizing common separators;
-the legacy hyphenated Workbench Private label matches its
-configured source. Pass sourceId;
+also accepted as a compatibility trigger. “Activate <name>” matches after
+normalizing common separators. The legacy hyphenated Workbench Private label
+remains a compatibility alias. Pass the exact returned sourceId;
 Never derive sessionId from sourceId.
 
 ## Modes

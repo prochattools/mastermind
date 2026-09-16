@@ -1,46 +1,27 @@
-# ProChat Mastermind Local Public Scope
+# Mastermind Local public scope
 
-This repo is for ProChat Mastermind Local only. Mastermind is the current
-product identity. Workbench and BuildFlow remain only as explicitly labeled
-technical compatibility names. The canonical live endpoint is
-`https://mastermind.prochat.tools`; `https://workbench.prochat.tools` remains a
-temporary compatibility hostname.
+Mastermind Local is the self-hosted, local-first product surface. Mastermind
+is the current product identity; Workbench and BuildFlow are compatibility
+identifiers only.
 
-Allowed in this repo:
+The canonical action endpoint is `https://mastermind.prochat.tools`.
+`https://workbench.prochat.tools` is a compatibility endpoint for existing
+configurations.
 
-- local-first Mastermind dashboard
-- local agent on the user's machine
-- local relay only when needed for local/Custom GPT connectivity
-- user-owned endpoint, tunnel, and domain guidance
-- local source management
-- branch-aware grouping for configured Git checkouts and linked worktrees
-- local indexing, search, and read workflows
-- bounded source/provider health diagnostics
-- exact owner-approved reconciliation proposals for stale or missing local
-  registrations; no automatic cleanup
-- exact reviewed-set recovery for already-reviewed safe registrations; each
-  registration is independently revalidated before any state change
-- dashboard active source context
-- explicit `sourceId` Custom GPT actions
-- safe local write policy
-- verified file operations
-- local activity feed
-- local plan/task workflow
-- local handoff prompts for Codex, Claude, and ChatGPT
-- open-source contribution workflow
-- free GitHub user documentation
+## Included
 
-Not allowed in this repo:
+- local dashboard, CLI, and native macOS application
+- user-owned repositories, folders, and knowledge sources
+- source registration, indexing, search, and health diagnostics
+- explicit source locking for Custom GPT Actions
+- bounded reads, guarded writes, commands, validation, and Git commits
+- durable Quick Mode and Goal Mode state
+- public OpenAPI schema and Custom GPT instructions
+- local handoff, activity, and evidence projections
+- public verification scripts and contribution workflow
 
-- Mastermind Managed planning
-- SaaS roadmap
-- paid, Pro, or commercial feature planning
-- billing, pricing, subscription, or account docs
-- customer onboarding or sales strategy
-- managed endpoint or managed product docs
-- hosted dashboard or hosted relay roadmap
-- managed multi-tenant team workspace plans
-- commercial production hosting plans
-- private roadmap or go-to-market strategy
+## Excluded
 
-The public repo should stay Mastermind Local only and should not explain the private product roadmap.
+The public snapshot does not include private operational plans, internal release
+controls, non-public infrastructure, or product planning that is not required
+to run or contribute to Mastermind Local.

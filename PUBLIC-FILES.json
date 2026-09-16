@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "sourceCommit": "1c274ff05b31738068ec29c16f1bb037ab4b79c1",
+  "sourceCommit": "d9201d7b137de965d2320cef4acc76bba3658aba",
   "files": [
     {
       "path": ".gitignore",
@@ -39,13 +39,13 @@
     },
     {
       "path": "PUBLIC-SOURCE.json",
-      "bytes": 325,
-      "sha256": "49cb67efe2767ab1dfe2e260eae17d92e769758292d7f1c9dfc2eee385190251"
+      "bytes": 317,
+      "sha256": "e6f7f4059ebb2ffcab4b0269c82bfb706cc5836f79798981a33c4b23ea00494b"
     },
     {
       "path": "README.md",
-      "bytes": 30240,
-      "sha256": "59d85fa2af774fbd7efc954fb472c5762fdc9f279d19f342f9db313d2527eaa5"
+      "bytes": 11772,
+      "sha256": "eadb93bf98efb157cc99b65ef8910c86a3f011cb5991473c7111d03bf488aa7c"
     },
     {
       "path": "SECURITY.md",
@@ -754,8 +754,18 @@
     },
     {
       "path": "docs/CUSTOM_GPT_INSTRUCTIONS.md",
-      "bytes": 8010,
-      "sha256": "ff1fedb03fe0d53379add4ec8ad7f0f361c4a5b6d72d4fb78299ee778a9ba435"
+      "bytes": 7953,
+      "sha256": "f681fff3e3fd0c9b8630134d71bb7d7f1fc10bbd0ce1d134695a5e830bef69e1"
+    },
+    {
+      "path": "docs/architecture.md",
+      "bytes": 2669,
+      "sha256": "c2cd14c7c3b7e79f0398a9e446335a8f130a608782ce9d2033a47f7a1d23e765"
+    },
+    {
+      "path": "docs/installation.md",
+      "bytes": 2783,
+      "sha256": "966f567d3bf8038860aa3ec7df0cb007a7b6747a586d8adece0b24b6a55ae021"
     },
     {
       "path": "docs/openapi.chatgpt.json",
@@ -764,38 +774,43 @@
     },
     {
       "path": "docs/openapi.chatgpt/README.md",
-      "bytes": 12182,
-      "sha256": "3ae436c21d3768d1a347698bc3f64aa1490dc0f05abc39b9b1134a3be7b626fa"
+      "bytes": 1740,
+      "sha256": "a8be19392c27c7df96f73f270c3a32b4e2f14288a4b00b22ffe682bac9fc7d77"
     },
     {
       "path": "docs/product/README.md",
-      "bytes": 1874,
-      "sha256": "d3f340c2aa9ddeac526d6a9dcf5bb30972741d99598095492a2743a6eba60378"
-    },
-    {
-      "path": "docs/product/agent-mode.md",
-      "bytes": 2578,
-      "sha256": "10c57e11557107ab4204f6225f706629e79cacc3c5619ad3ff61ceeefd53bf3e"
+      "bytes": 1280,
+      "sha256": "4689570357447b7100154fec07561f21687038b6caf5445f0bf2ffa75b155286"
     },
     {
       "path": "docs/product/chatgpt-first-workflow.md",
-      "bytes": 8374,
-      "sha256": "768dce80b113bbde5d0cafbbd89fdb8a7bbfb62ee8c472cdf4b9206987649149"
+      "bytes": 1725,
+      "sha256": "fde6469bf65c2f164c0b0a760176deec4aac3a79710d89b850b68e28be663cbc"
     },
     {
       "path": "docs/product/local/feature-scope.md",
-      "bytes": 1619,
-      "sha256": "a23561cc22b6d2f8ea5946fce4ac7255cc3ba136ae6beb78f0e2cfdf105ab83f"
+      "bytes": 1056,
+      "sha256": "05d53d73f84ac7f7a5ecaa31de1b67c560e47b12f7e0fb7b5945d391220aa0bc"
     },
     {
       "path": "docs/product/public-scope.md",
-      "bytes": 1847,
-      "sha256": "a3fe4a800863820e4828703181d21238dbe676e849eefedafca9a21371953b60"
+      "bytes": 1089,
+      "sha256": "07419ec01ec966bcffdabaca2d307e95c6b7f22001883a6228389b68d470d7af"
+    },
+    {
+      "path": "docs/safety.md",
+      "bytes": 2371,
+      "sha256": "2147f08e0fb124bd8f36105c7093eb9af7b87d75bc9d3379a0d69727843c8017"
+    },
+    {
+      "path": "docs/troubleshooting.md",
+      "bytes": 2270,
+      "sha256": "98d49b9478e473341638a25b1f415b963e11c77ead8a52808e841a456dceda8d"
     },
     {
       "path": "package.json",
-      "bytes": 5929,
-      "sha256": "e42da95b0d34901976b08c9d2d01e127b39d5233b7346545c30e3170f4c404eb"
+      "bytes": 5921,
+      "sha256": "bd2d76deeafdafa671ec1a645e9eeb0b19999c0a920093e5d86ebb03ec55c296"
     },
     {
       "path": "packages/bridge/device-client.js",
@@ -874,8 +889,8 @@
     },
     {
       "path": "packages/cli/package.json",
-      "bytes": 1078,
-      "sha256": "8eabcd1913176bd6ba795e3b6f3e360fc22342803a68afd5c1aabb7003393515"
+      "bytes": 1098,
+      "sha256": "4762b6269c3728202a5223ea1fd54d88c7059c8306028bd43c70e271f962127f"
     },
     {
       "path": "packages/cli/src/agent/action-round-trip-artifact.ts",
@@ -2824,8 +2839,8 @@
     },
     {
       "path": "scripts/audit-public-scope.mjs",
-      "bytes": 5056,
-      "sha256": "dab48aeb7737e8bf5ffea721b073c89fc770c3c8c28f45477cdfb2d1f7a1f76c"
+      "bytes": 5281,
+      "sha256": "ce879c49453b05036a4c5d8b71dedbeb843495574b13a4047f369a3a02e4e15b"
     },
     {
       "path": "scripts/buildflow-local-stack.sh",

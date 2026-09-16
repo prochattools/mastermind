@@ -1,26 +1,30 @@
-# ProChat Mastermind Local Documentation
+# Mastermind Local documentation
 
-This index covers the generated public Mastermind Local snapshot.
-
-The current public beta is `1.3.25-beta`. It adds the completed Mastermind
-rebrand while preserving exact reviewed-set recovery,
-for already-reviewed safe registrations while preserving independent
-revalidation, explicit partial results, blocked ambiguity, and no automatic
-cleanup.
+This directory is the public product guide for the self-hosted Mastermind
+Local snapshot. The current beta is `1.3.25-beta`.
 
 ## Start here
 
-1. [`public-scope.md`](./public-scope.md) — the free, self-hosted product boundary.
-2. [`local/feature-scope.md`](./local/feature-scope.md) — supported local capabilities.
-3. [`chatgpt-first-workflow.md`](./chatgpt-first-workflow.md) — how ChatGPT and Mastermind divide responsibility.
-4. [`agent-mode.md`](./agent-mode.md) — bounded persistent execution and packet behavior.
-5. [`../openapi.chatgpt/README.md`](../openapi.chatgpt/README.md) — Custom GPT action setup.
-6. [`../CUSTOM_GPT_INSTRUCTIONS.md`](../CUSTOM_GPT_INSTRUCTIONS.md) — public Custom GPT instructions.
-
-The current release also documents bounded direct `rg` search, exact command evidence, strict source locking, placeholder rejection, confirmation-gated operations, bounded doctor diagnostics, owner-approved reconciliation, reviewed-set recovery, and the fixed read-only Brain workflow export. These capabilities remain constrained by the five canonical Actions. The canonical endpoint is `https://mastermind.prochat.tools`; `https://workbench.prochat.tools` remains a temporary compatibility hostname.
+1. [`../../README.md`](../../README.md) — product overview and quick start.
+2. [`../../installation.md`](../../installation.md) — local, macOS, and
+   Custom GPT installation.
+3. [`../../architecture.md`](../../architecture.md) — runtime and action
+   boundaries.
+4. [`../../safety.md`](../../safety.md) — authority, writes, commands, and
+   Git safety.
+5. [`../../troubleshooting.md`](../../troubleshooting.md) — bounded recovery
+   paths.
+6. [`../../openapi.chatgpt/README.md`](../../openapi.chatgpt/README.md) —
+   Custom GPT schema import.
+7. [`../../CUSTOM_GPT_INSTRUCTIONS.md`](../../CUSTOM_GPT_INSTRUCTIONS.md) —
+   canonical GPT behavior.
 
 ## Public boundary
 
-The public repository contains Mastermind Local only. Managed services, customer operations, billing systems, private modules, internal release controls, and commercial planning are not part of the generated snapshot.
+Mastermind Local contains the local runtime, dashboard, CLI, native macOS
+surface, public action schema, and contribution documentation needed for
+user-owned workflows. Private operational material, internal release controls,
+and non-public product planning are intentionally not exported.
 
-Public source is licensed under `AGPL-3.0-only`. Separate commercial or OEM licensing may be available as described in the repository root.
+The public source is licensed under `AGPL-3.0-only`. See the repository root
+for licensing, security, and contribution information.
