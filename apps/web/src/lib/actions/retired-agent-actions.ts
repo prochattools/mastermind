@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 
 const recovery = [
-  'Reimport the current OpenAPI schema from https://workbench.prochat.tools/api/openapi.',
+  'Reimport the current Mastermind OpenAPI schema from https://mastermind.prochat.tools/api/openapi.',
   'Use getWorkbenchStatus, readWorkbenchContext, applyWorkbenchFileChange, commitWorkbenchChanges, or runWorkbenchCommand.',
   'Start a new Custom GPT chat after updating the GPT so stale Agent Mode actions are not reused.'
 ]

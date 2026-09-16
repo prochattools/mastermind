@@ -17,20 +17,20 @@ ProChat Mastermind is free, self-hosted, and local-first. It is designed for dev
 
 ```text
 Public product name: ProChat Mastermind
-Technical compatibility name: BuildFlow
+Legacy compatibility names: Workbench and BuildFlow
 ```
 
-Use **ProChat Mastermind** in current public documentation, descriptions, links, interviews, and onboarding. The Workbench and BuildFlow names remain only where historical evidence or older package names, scripts, config paths, source IDs, or API compatibility surfaces still require them. The live endpoint remains `https://workbench.prochat.tools` until the approved cutover to `https://mastermind.prochat.tools`.
+Use **ProChat Mastermind** in all current public documentation, descriptions, links, interviews, and onboarding. Workbench and BuildFlow remain only as explicitly labeled historical or compatibility names. The canonical endpoint is `https://mastermind.prochat.tools`; `https://workbench.prochat.tools` remains a temporary compatibility hostname.
 
 If this project helps you, please **star it, fork it, try it on a real repo, open issues, request features, and share what you build with it.**
 
 ```mermaid
 flowchart LR
   You["You in ChatGPT"] --> GPT["Custom GPT"]
-  GPT --> Endpoint["Public Workbench endpoint"]
+  GPT --> Endpoint["Public Mastermind endpoint"]
   Endpoint --> Tunnel["HTTPS / optional tunnel"]
   Tunnel --> Ingress["Native ingress<br/>127.0.0.1:3154"]
-  Ingress --> Core["Portable Workbench core"]
+  Ingress --> Core["Portable Mastermind core"]
   Core --> Sources["Connected repositories"]
   Core --> Writes["Verified writes"]
   Core --> Commands["Allowlisted commands"]
@@ -46,20 +46,20 @@ flowchart LR
   class Writes,Commands safe;
 ```
 
-## Why ProChat Workbench exists
+## Why ProChat Mastermind exists
 
 AI coding tools are powerful, but they often work in the wrong place.
 
 A remote model may not see your local repo. A browser chat may not be able to run your local tests. A CLI agent may have strong execution but weak long-term planning context. Copying files back and forth wastes time and breaks flow.
 
-ProChat Workbench bridges that gap with a native macOS supervisor, a portable
+ProChat Mastermind bridges that gap with a native macOS supervisor, a portable
 local core, and a bounded HTTPS/API adapter.
 
-It keeps ChatGPT as the main interface while your own machine remains the source of truth. Your Custom GPT can ask Workbench for exact repo context, read the files it needs, write verified changes back to disk, run allowlisted validation commands, and keep a progress trail.
+It keeps ChatGPT as the main interface while your own machine remains the source of truth. Your Custom GPT can ask Mastermind for exact repo context, read the files it needs, write verified changes back to disk, run allowlisted validation commands, and keep a progress trail.
 
 The result is a ChatGPT-first workflow for real local projects.
 
-For the fastest day-to-day repository work, the native Workbench application
+For the fastest day-to-day repository work, the native Mastermind application
 is the selected local goal surface. Choose a repository, enter a natural-
 language goal in New Goal, and follow the local Activity Ledger and terminal
 result. The compact execution selector is persisted per owner:
@@ -76,13 +76,13 @@ Complex changes remain behind the governed review path when Direct cannot prove
 the scope or transformation. If Codex is rate-limited or unavailable, Auto
 continues with Direct where safe and reports the result in natural language.
 This local path bypasses Custom GPT Action-ingress latency while reusing the
-same guarded Workbench execution architecture. Custom GPT remains the
+same guarded Mastermind execution architecture. Custom GPT remains the
 supported conversational and remote path for planning, explanation,
 oversight, and handoff.
 
 ## What you can build with it
 
-ProChat Workbench is useful for much more than asking questions about a codebase.
+ProChat Mastermind is useful for much more than asking questions about a codebase.
 
 You can use it to:
 
@@ -104,7 +104,7 @@ You can use it to:
 
 ## The value in one sentence
 
-**ProChat Workbench lets you use ChatGPT as the reasoning layer and your local computer as the execution layer.**
+**ProChat Mastermind lets you use ChatGPT as the reasoning layer and your local computer as the execution layer.**
 
 That means you can brainstorm, inspect, plan, edit, validate, and iterate on real local projects without turning every task into a separate hosted API workflow.
 
@@ -112,11 +112,11 @@ That means you can brainstorm, inspect, plan, edit, validate, and iterate on rea
 
 ### ChatGPT-first local repo access
 
-ProChat Workbench exposes a Custom GPT action schema so ChatGPT can talk to your local Workbench endpoint.
+ProChat Mastermind exposes a Custom GPT action schema so ChatGPT can talk to your local Mastermind endpoint.
 
 Your GPT can:
 
-- check Workbench status
+- check Mastermind status
 - list connected sources
 - lock an explicit `sourceId` for the chat
 - inspect file trees
@@ -130,9 +130,9 @@ Your GPT can:
 
 ### Local source management
 
-Add repos, notes, docs, skills, or business folders as Workbench sources.
+Add repos, notes, docs, skills, or business folders as Mastermind sources.
 
-Workbench supports:
+Mastermind supports:
 
 - one or multiple active sources
 - Git branch metadata for configured repositories (`branchName`, available branch count, and worktree flag)
@@ -150,13 +150,13 @@ Workbench supports:
 - exact reviewed-set recovery for already-reviewed safe registrations, with
   independent revalidation and explicit partial results
 
-Every repo action carries an explicit source lock. Start with `getWorkbenchStatus?include=sources`, then reuse one exact enabled `sourceId` for the conversation. The placeholders `default`, `workspace`, `current`, and `repo` are rejected; Workbench never maps them to an implicit or environment-specific source.
+Every repo action carries an explicit source lock. Start with `getMastermindStatus?include=sources`, then reuse one exact enabled `sourceId` for the conversation. The placeholders `default`, `workspace`, `current`, and `repo` are rejected; Mastermind never maps them to an implicit or environment-specific source.
 
-Branch-aware activation works on configured checkouts and worktrees. When a repo has multiple configured branch worktrees, enabling/disabling or activating one configured branch expands to the configured siblings in the same repo group. Workbench does not silently check out every Git branch inside one working tree; create linked Git worktrees and add/discover them as sources when you want simultaneous branch access.
+Branch-aware activation works on configured checkouts and worktrees. When a repo has multiple configured branch worktrees, enabling/disabling or activating one configured branch expands to the configured siblings in the same repo group. Mastermind does not silently check out every Git branch inside one working tree; create linked Git worktrees and add/discover them as sources when you want simultaneous branch access.
 
 ### Verified file writes
 
-Workbench can write files, but it does not blindly mutate your machine.
+Mastermind can write files, but it does not blindly mutate your machine.
 
 It supports:
 
@@ -180,11 +180,11 @@ the centralized deny policy blocks secrets, credentials, Git internals,
 protected security material, generated/runtime output, and paths outside the
 source. Folder allowlists are not the authorization model.
 
-A write is not considered successful unless Workbench verifies it on disk.
+A write is not considered successful unless Mastermind verifies it on disk.
 
 ### Safe command runner
 
-Workbench can run repo-local commands through an owner-scoped repository shell
+Mastermind can run repo-local commands through an owner-scoped repository shell
 with a small high-risk deny boundary. The selected source root remains the
 execution and audit boundary; normal repository tooling is not hardcoded into
 another executable allowlist.
@@ -200,11 +200,11 @@ Supported command families include:
 - safe package scripts by name, including scripts from the repo root
 - marker-based test runs where supported
 - named security scans
-- Workbench verification scripts
+- Mastermind verification scripts
 
 Direct `rg` execution is read-only and structured. Regex alternation such as `capture/inbox|capture/failed|router/` remains one argv element, execution always uses `shell:false`, and shell operators, subprocess/preprocessor options, traversal, prohibited paths, writes, and network access remain blocked. A no-match exit is reported as completed evidence rather than a failed command.
 
-`run_repo_shell` is available through the existing `runWorkbenchCommand` Action
+`run_repo_shell` is available through the existing `runMastermindCommand` Action
 for owner-scoped repository work. It supports normal pipelines, `&&`/`||`,
 environment assignments in a redacted task environment, globs, and redirects
 only within the selected source root or authorized temporary directories.
@@ -217,7 +217,7 @@ Command responses project verified evidence from the runner, including the execu
 
 Confirmation-gated operations return `needs_confirmation` and a backend-issued token. Do not retry with guessed tokens or bypass the gate. The fixed `n8n_workflow_export` capability is limited to the Brain source, one approved workflow, one credential-abstracting wrapper invocation, and one rollback artifact; it does not update, activate, delete, invoke, or deploy workflows.
 
-Workbench does not expose an unbounded host terminal. Repository shell access
+Mastermind does not expose an unbounded host terminal. Repository shell access
 is source-root scoped, owner-bound, bounded, redacted, audited, and subject to
 the narrow high-risk deny boundary above.
 
@@ -225,12 +225,12 @@ Named security scans use syntax-aware handling for JavaScript and TypeScript: in
 
 ### Quick and Goal modes
 
-Workbench supports Quick mode for focused work and Goal mode for substantial
+Mastermind supports Quick mode for focused work and Goal mode for substantial
 work built from persistent state and bounded packets.
 
-ChatGPT remains the reasoning layer. Workbench provides exact local context,
+ChatGPT remains the reasoning layer. Mastermind provides exact local context,
 guarded file writes, targeted validation, persistent run state, bounded packet
-execution, compact evidence, and explicit Git operations. Workbench does not
+execution, compact evidence, and explicit Git operations. Mastermind does not
 become an unrestricted autonomous agent runtime.
 
 Use this default flow:
@@ -252,7 +252,7 @@ Push: only when explicitly requested
 
 This keeps ChatGPT powerful while avoiding the main latency failure mode: long chains of model reasoning plus action calls.
 
-Open-ended reasoning remains with ChatGPT. Workbench may persist goals, runs,
+Open-ended reasoning remains with ChatGPT. Mastermind may persist goals, runs,
 packets, checkpoints, validation evidence, and bounded continuation state so
 deterministic local work can resume safely without turning the public action
 surface into a long-running request.
@@ -261,10 +261,10 @@ For a substantial repository request, the Custom GPT can send one bounded
 `goalDispatch` manifest with the exact source, bounded file/directory scope, reads, local commands,
 edits, validation, and explicitly authorized commit intent. A strictly
 read-only goal sets `readOnly: true`, supplies bounded reads or commands, and
-uses `steps: []`. Workbench persists
+uses `steps: []`. Mastermind persists
 that goal, executes the internal repository work locally, and projects one
 compact natural-language terminal result. This keeps local orchestration,
-repo-shell work, validation, and Git inside the durable Workbench run instead
+repo-shell work, validation, and Git inside the durable Mastermind run instead
 of requiring a separate Custom GPT Action for each internal step. Long jobs use
 durable state and a single result retrieval when technically necessary; they
 do not use Action polling or heartbeat calls.
@@ -278,18 +278,18 @@ The Custom GPT should update the handoff after each meaningful chunk with comple
 That means a later conversation can say:
 
 ```text
-Resume Workbench work on <repository name> from the progress document.
+Resume Mastermind work on <repository name> from the progress document.
 ```
 
-Workbench can then read the handoff document, verify source scope and git status, and continue from the next unchecked task.
+Mastermind can then read the handoff document, verify source scope and git status, and continue from the next unchecked task.
 
 ### OpenAI Custom GPT interface limits
 
-Workbench cannot directly rename ChatGPT’s native conversation titles, batch names, or input placeholder. Those UI elements are controlled by OpenAI’s ChatGPT interface, not by the Workbench action schema.
+Mastermind cannot directly rename ChatGPT’s native conversation titles, batch names, or input placeholder. Those UI elements are controlled by OpenAI’s ChatGPT interface, not by the Mastermind action schema.
 
 The practical workaround is to use one source per conversation, start prompts with the source name, and rely on persistent repo-local handoff documents. If your ChatGPT client supports manually renaming a conversation, rename it to the repo or goal.
 
-## Effective Workbench prompts
+## Effective Mastermind prompts
 
 Use this pattern for serious work:
 
@@ -323,7 +323,7 @@ Implement the missing failing endpoint fixes and make the API test suite pass.
 
 Inspect the repo, make a concise implementation plan, complete the first safe slice, run targeted validation, and stop with the next concrete action.
 
-Do not ask for intermediate approval unless Workbench requires confirmation. Commit explicit validated paths when appropriate.
+Do not ask for intermediate approval unless Mastermind requires confirmation. Commit explicit validated paths when appropriate.
 ```
 
 ### Example: build a module
@@ -356,13 +356,13 @@ Activate brain.
 Goal:
 Clean up my AI skills folder, improve naming consistency, add README files where useful, and create an index of the most important skills.
 
-Complete a bounded batch, but stop if Workbench blocks access to private or secret folders.
+Complete a bounded batch, but stop if Mastermind blocks access to private or secret folders.
 ```
 
 ### Example: prepare a commit
 
 ```text
-Activate workbench.
+Activate Mastermind Private.
 
 Goal:
 Improve the dashboard source picker onboarding flow.
@@ -370,13 +370,13 @@ Improve the dashboard source picker onboarding flow.
 Validate the change, commit it with a clear message, and stop before pushing unless I ask.
 ```
 
-## What ProChat Workbench can do today
+## What ProChat Mastermind can do today
 
-ProChat Workbench currently includes:
+ProChat Mastermind currently includes:
 
 - native macOS GUI, helper, and bundled portable core
 - native API ingress on loopback `127.0.0.1:3154`
-- public HTTPS deployment at `https://workbench.prochat.tools`
+- public HTTPS deployment at `https://mastermind.prochat.tools`
 - compatibility HTTP stack only for explicit rollback
 - source management for repos, notes, docs, skills, and local folders
 - recursive repository discovery from a root folder
@@ -403,7 +403,7 @@ ProChat Workbench currently includes:
 
 ## Safety, benefits, and risks
 
-Workbench is powerful because it connects ChatGPT to your local workspace. That also means it needs clear boundaries.
+Mastermind is powerful because it connects ChatGPT to your local workspace. That also means it needs clear boundaries.
 
 ### Benefits
 
@@ -428,7 +428,7 @@ Workbench is powerful because it connects ChatGPT to your local workspace. That 
 
 ### Important limitations
 
-Workbench does not silently edit real `.env` files, expose secrets, run arbitrary shell commands, force-push, or deploy with unrestricted terminal access.
+Mastermind does not silently edit real `.env` files, expose secrets, run arbitrary shell commands, force-push, or deploy with unrestricted terminal access.
 
 Routine app work is intentionally less interrupted now: package manifests, framework config, Docker files, scripts, migrations, and source-controlled assets can be edited under the repo-maintainer policy. The hard boundary is secrets, generated/runtime output, unsafe paths, and irreversible operations.
 
@@ -499,7 +499,7 @@ node packages/cli/dist/bin/workbench.js doctor --json
 
 ## Connect a Custom GPT
 
-In the Custom GPT editor, import the Workbench action schema from your own endpoint.
+In the Custom GPT editor, import the Mastermind action schema from your own endpoint.
 
 Use the checked-in schema for inspection, and use the deployed HTTPS schema
 for Custom GPT import:
@@ -512,7 +512,7 @@ Owner-local inspection endpoint:
 http://127.0.0.1:3154/api/openapi
 
 Canonical Custom GPT endpoint:
-https://workbench.prochat.tools/api/openapi
+https://mastermind.prochat.tools/api/openapi
 ```
 
 Another deployment may use its own HTTPS domain or tunnel. A Custom GPT must
@@ -539,7 +539,7 @@ Read the README and suggest improvements.
 For implementation work, be explicit:
 
 ```text
-Activate Workbench, select the intended repository by name, and complete one
+Activate Mastermind, select the intended repository by name, and complete one
 bounded task. Validate and commit only the explicit paths, then stop unless I
 ask you to continue.
 ```
@@ -571,23 +571,23 @@ flowchart TD
 
 ## Custom GPT actions
 
-ProChat Workbench exposes exactly five Custom GPT actions:
+ProChat Mastermind exposes exactly five Custom GPT actions:
 
-- `getWorkbenchStatus`
-- `readWorkbenchContext`
-- `applyWorkbenchFileChange`
-- `commitWorkbenchChanges`
-- `runWorkbenchCommand`
+- `getMastermindStatus`
+- `readMastermindContext`
+- `applyMastermindFileChange`
+- `commitMastermindChanges`
+- `runMastermindCommand`
 
 These actions let ChatGPT inspect, read, write, validate, commit, and continue
 bounded Quick or Goal mode work without pretending it has unrestricted local
 access.
 
-There is no Custom GPT action for changing dashboard active context. The GPT locks a `sourceId` conversationally after `getWorkbenchStatus?include=sources` and passes that explicit `sourceId` on every repo action. Legacy `/api/actions/agent/*` polling routes are retired and must not be imported into the GPT schema.
+There is no Custom GPT action for changing dashboard active context. The GPT locks a `sourceId` conversationally after `getMastermindStatus?include=sources` and passes that explicit `sourceId` on every repo action. Legacy `/api/actions/agent/*` polling routes are retired and must not be imported into the GPT schema.
 
-## Who ProChat Workbench is for
+## Who ProChat Mastermind is for
 
-ProChat Workbench is for:
+ProChat Mastermind is for:
 
 - indie hackers building apps with ChatGPT
 - developers who want local-first AI workflows
@@ -597,9 +597,9 @@ ProChat Workbench is for:
 - builders who want the planning quality of ChatGPT with the grounding of local files
 - anyone who wants to reduce copy-paste between chat, repo, docs, and terminal
 
-## What ProChat Workbench is not
+## What ProChat Mastermind is not
 
-ProChat Workbench is not a hosted backend, not an unrestricted terminal bridge, and not a replacement for reviewing your own code.
+ProChat Mastermind is not a hosted backend, not an unrestricted terminal bridge, and not a replacement for reviewing your own code.
 
 It is the local context, safety, and execution layer between ChatGPT and your workspace.
 
@@ -610,17 +610,17 @@ Use it to reason, plan, inspect, read, write verified changes, run safe validati
 Useful docs:
 
 - [`docs/product/README.md`](docs/product/README.md) — product index
-- [`docs/product/philosophy.md`](docs/product/philosophy.md) — Workbench philosophy
+- [`docs/product/philosophy.md`](docs/product/philosophy.md) — Mastermind philosophy
 - [`docs/product/strategy.md`](docs/product/strategy.md) — current architecture and operating modes
 - [`docs/product/chatgpt-first-workflow.md`](docs/product/chatgpt-first-workflow.md) — ChatGPT-first strategy
-- [`docs/product/public-scope.md`](docs/product/public-scope.md) — public Workbench scope
+- [`docs/product/public-scope.md`](docs/product/public-scope.md) — public Mastermind scope
 - [`docs/product/local/feature-scope.md`](docs/product/local/feature-scope.md) — Local feature scope
 - [`docs/openapi.chatgpt/README.md`](docs/openapi.chatgpt/README.md) — Custom GPT action import guide
 - [`docs/CUSTOM_GPT_INSTRUCTIONS.md`](docs/CUSTOM_GPT_INSTRUCTIONS.md) — GPT instructions
 
 ## Roadmap ideas
 
-ProChat Workbench Local is moving toward a more complete ChatGPT-first local repository workspace.
+ProChat Mastermind Local is moving toward a more complete ChatGPT-first local repository workspace.
 
 Public areas worth exploring include:
 
@@ -633,23 +633,23 @@ Public areas worth exploring include:
 - improved setup for non-technical users;
 - reusable local skill packages.
 
-Open an issue if you have a local-first workflow Workbench should support.
+Open an issue if you have a local-first workflow Mastermind should support.
 
 ## Licensing
 
-The generated public Workbench Local repository is licensed under the GNU Affero General Public License v3.0 only (`AGPL-3.0-only`) as the Workbench Local product-specific exception recorded in Mind. See [`LICENSE`](LICENSE).
+The generated public Mastermind Local repository is licensed under the GNU Affero General Public License v3.0 only (`AGPL-3.0-only`) as the Mastermind Local product-specific exception recorded in Mind. See [`LICENSE`](LICENSE).
 
-That exception applies only to ProChat Workbench Local public snapshot files. It does not apply to ProChat Memory, ProChat Memory for QA, future products, managed services, private modules, customer operations, or internal commercial systems.
+That exception applies only to ProChat Mastermind Local public snapshot files. It does not apply to ProChat Memory, ProChat Memory for QA, future products, managed services, private modules, customer operations, or internal commercial systems.
 
 A separate commercial or OEM license may be requested by organizations that need proprietary embedding, redistribution, or modified hosted use. Public documentation does not grant commercial or OEM rights; commercial rights require a separate written agreement. See [`COMMERCIAL-LICENSING.md`](COMMERCIAL-LICENSING.md). ProChat trademarks are governed separately by [`TRADEMARKS.md`](TRADEMARKS.md).
 
-The private engineering repository is the authoritative implementation source for Workbench code and release mechanics. Mind remains authoritative for company-level strategy and the Workbench Local licensing exception. Public releases are deterministic, reviewed snapshots generated from exact private commits. Managed services, private modules, customer operations, and internal commercial material are not part of the public snapshot.
+The private engineering repository is the authoritative implementation source for Mastermind code and release mechanics. Mind remains authoritative for company-level strategy and the Mastermind Local licensing exception. Public releases are deterministic, reviewed snapshots generated from exact private commits. Managed services, private modules, customer operations, and internal commercial material are not part of the public snapshot.
 
 The dashboard includes a source-code link. Operators of modified network-accessible versions must provide the corresponding source required by the AGPL.
 
 ## Contributing
 
-ProChat Workbench Local is free, self-hosted, and open source.
+ProChat Mastermind Local is free, self-hosted, and open source.
 
 - Star or fork the public repository.
 - Try it on a repository you control.
@@ -658,9 +658,9 @@ ProChat Workbench Local is free, self-hosted, and open source.
 - Review [`CONTRIBUTING.md`](CONTRIBUTING.md) before submitting code.
 
 ```text
-github.com/prochattools/workbench
+github.com/prochattools/mastermind
 ```
 
 External code contributions require contributor terms that preserve ProChat's ability to distribute accepted work under both AGPL and separate commercial licenses. Issues and design feedback do not require a contributor agreement.
 
-Workbench is still early, but it is already useful. The best way to improve it is to use it on real work and explain where the workflow still feels slow, risky, or magical in the wrong way.
+Mastermind is still early, but it is already useful. The best way to improve it is to use it on real work and explain where the workflow still feels slow, risky, or magical in the wrong way.

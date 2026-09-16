@@ -21,7 +21,7 @@ ProChat will acknowledge a valid report, investigate it, and coordinate remediat
 
 ## Scope
 
-Security reports may cover the public Workbench Local snapshot, including:
+Security reports may cover the public Mastermind Local snapshot, including:
 
 - local dashboard and agent;
 - Custom GPT action routes and authentication;

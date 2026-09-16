@@ -1,13 +1,13 @@
-# ProChat Workbench Custom GPT Action Imports
+# ProChat Mastermind Custom GPT Action Imports
 
-Use this guide to connect a Custom GPT to your own ProChat Workbench endpoint.
+Use this guide to connect a Custom GPT to your own ProChat Mastermind endpoint.
 
-Workbench is designed for two kinds of interaction:
+Mastermind is designed for two kinds of interaction:
 
 - **Quick mode** for focused questions and small edits.
 - **Goal mode** for substantial local development work built from persistent state and multiple bounded action cycles.
 
-For the lowest-latency local repository work, use the native Workbench New Goal
+For the lowest-latency local repository work, use the native Mastermind New Goal
 surface. It reuses the same durable run and packet architecture without the
 Custom GPT Action-ingress boundary. Custom GPT remains the supported
 conversation-first path for remote planning, explanation, oversight, and
@@ -19,7 +19,7 @@ The GPT-facing API remains short and fail-fast. Larger goals must be implemented
 
 - schema file: `docs/openapi.chatgpt.json`
 - owner-local native ingress for inspection: `http://127.0.0.1:3154/api/openapi`
-- hosted endpoint: `https://workbench.prochat.tools/api/openapi`
+- hosted endpoint: `https://mastermind.prochat.tools/api/openapi`
 - another HTTPS endpoint you control: `https://<your-domain-or-tunnel>/api/openapi`
 
 For actual ChatGPT Actions, the server URL in the imported schema must be reachable by ChatGPT over HTTPS. A localhost server URL is suitable for local generation and inspection, not for ChatGPT-hosted runtime calls.
@@ -28,11 +28,11 @@ For actual ChatGPT Actions, the server URL in the imported schema must be reacha
 
 The current stable schema exposes five operations:
 
-- `getWorkbenchStatus`
-- `readWorkbenchContext`
-- `applyWorkbenchFileChange`
-- `commitWorkbenchChanges`
-- `runWorkbenchCommand`
+- `getMastermindStatus`
+- `readMastermindContext`
+- `applyMastermindFileChange`
+- `commitMastermindChanges`
+- `runMastermindCommand`
 
 These operations are the stable quick-mode foundation and the control surface for the first goal-mode phases.
 
@@ -46,22 +46,22 @@ Current route deadlines:
 
 Routing and source-lock contract:
 
-- `getWorkbenchStatus` is for health, explicit source discovery, and resume/current-state checks; it is not a generic content preflight.
-- `readWorkbenchContext` owns repository files, symbols, and bounded task context. When the source is known, call it directly without a status round trip.
-- `Workbench Private` resolves exactly to `prochattools-workbench`; never substitute Brain or another configured source.
-- `runWorkbenchCommand` is reserved for explicit command, validation, or evidence operations. Do not use `git_status_short` as a generic repository/content preflight.
+- `getMastermindStatus` is for health, explicit source discovery, and resume/current-state checks; it is not a generic content preflight.
+- `readMastermindContext` owns repository files, symbols, and bounded task context. When the source is known, call it directly without a status round trip.
+- `Mastermind Private` resolves exactly to `prochattools-mastermind`; never substitute Brain or another configured source.
+- `runMastermindCommand` is reserved for explicit command, validation, or evidence operations. Do not use `git_status_short` as a generic repository/content preflight.
 
 Public responses use the compact projection required by the GPT byte budget. Native macOS callers use the private full-source projection when path and index metadata are required; the projections are intentionally separate.
 
-If an operation cannot finish safely, Workbench should return structured timeout, unavailable, confirmation, or narrower-scope guidance before the external action timeout.
+If an operation cannot finish safely, Mastermind should return structured timeout, unavailable, confirmation, or narrower-scope guidance before the external action timeout.
 
 ### Durable validation results
 
-`runWorkbenchCommand` keeps the existing five-operation public surface while allowing `validationJobOperation` to be `submit`, `status`, or `cancel`. A validation submit is acknowledged with the existing persisted `validationJobId`, also returned as `resultRef`. If the HTTP response is lost, retry the same `idempotencyKey` or query the result reference; do not submit a new job.
+`runMastermindCommand` keeps the existing five-operation public surface while allowing `validationJobOperation` to be `submit`, `status`, or `cancel`. A validation submit is acknowledged with the existing persisted `validationJobId`, also returned as `resultRef`. If the HTTP response is lost, retry the same `idempotencyKey` or query the result reference; do not submit a new job.
 
 For `status`, omit `resultStream` for compact job state, or select `stdout`/`stderr` and request a bounded UTF-8 window with `resultPageBytes`. The response includes `resultPage.nextCursor` when more stored output exists. Pass that opaque cursor back with the same source and result reference. Pages are retry-stable, source-authorized, secret-redacted by the command runner, and retained only while the terminal job record is retained. `cancel` is a separate control request and must be reconciled by status. The public contract does not advertise heartbeat or SSE because support was not established by a real Custom GPT client.
 
-In a fresh conversation, bootstrap the strict command session with one bounded `readWorkbenchContext` call using the already-known exact `sourceId` (for example `mode: "list_files", limit: 1`). Use the returned `workbenchRun.sessionId` exactly in the v2 `runWorkbenchCommand` envelope: `{ "version": 2, "sessionId": "<returned sessionId>", "command": { "sourceId": "<exact sourceId>", "commandKind": "<allowlisted command>" } }`. This is a read-only session bootstrap, not a status preflight; never invent or derive a session ID. If a read-only command returns `session_invalid`, bootstrap once again and retry only that same read-only command once. Correct strict-validation failures before retrying; never automatically retry mutations.
+In a fresh conversation, bootstrap the strict command session with one bounded `readMastermindContext` call using the already-known exact `sourceId` (for example `mode: "list_files", limit: 1`). Use the returned `workbenchRun.sessionId` exactly in the v2 `runMastermindCommand` envelope: `{ "version": 2, "sessionId": "<returned sessionId>", "command": { "sourceId": "<exact sourceId>", "commandKind": "<allowlisted command>" } }`. This is a read-only session bootstrap, not a status preflight; never invent or derive a session ID. If a read-only command returns `session_invalid`, bootstrap once again and retry only that same read-only command once. Correct strict-validation failures before retrying; never automatically retry mutations.
 
 ## Goal-mode behavior
 
@@ -80,7 +80,7 @@ Custom GPT accepts a high-level goal
   -> verifies exact repository context
   -> compiles or reserves a bounded work packet
   -> submits through a short action
-  -> Workbench executes locally
+  -> Mastermind executes locally
   -> GPT retrieves compact persisted evidence
   -> GPT continues only when continuation state permits it
 ```
@@ -104,7 +104,7 @@ Quick mode remains available for focused questions and small edits. Goal mode sh
 
 ## Context and navigation modes
 
-`readWorkbenchContext` supports bounded navigation and exact reads:
+`readMastermindContext` supports bounded navigation and exact reads:
 
 - `graph_context` reads cached Graphify navigation metadata when present
 - `grep_context` finds bounded matches in one file
@@ -120,26 +120,26 @@ Use Graphify for unknown architecture, then verify exact source before editing. 
 - Every repo-specific action must pass an explicit `sourceId`.
 - Dashboard active context is not implicit GPT scope.
 - A conversation should lock one source until the user explicitly changes it.
-- Configured Git worktrees may be grouped for dashboard use, but Workbench must not switch the GPT’s source silently.
-- Call `getWorkbenchStatus?include=sources` before the first repo action and use one exact enabled returned ID.
-- Reject `default`, `workspace`, `current`, and `repo`; Workbench returns an actionable source-selection response instead of dispatching them.
+- Configured Git worktrees may be grouped for dashboard use, but Mastermind must not switch the GPT’s source silently.
+- Call `getMastermindStatus?include=sources` before the first repo action and use one exact enabled returned ID.
+- Reject `default`, `workspace`, `current`, and `repo`; Mastermind returns an actionable source-selection response instead of dispatching them.
 
-Natural activation is discovery-first: “Activate Workbench” lists the available
+Natural activation is discovery-first: “Activate Mastermind” lists the available
 human-readable repository labels and their active state. “Activate
 `<repository name>`” matches one unique enabled label/name after normalizing
 case and common separators such as hyphens, underscores, and spaces. For
-example, `workbench` matches `Workbench Private`. The GPT then uses the
+example, `mastermind` matches `Mastermind Private`. The GPT then uses the
 returned ID internally to load bounded context and lock the conversation to that
 source. Users do not need to know source IDs. Ambiguous names require a label
 choice; the GPT must not guess or silently change the global dashboard context.
 
 ## Bounded command evidence
 
-`runWorkbenchCommand` supports direct read-only `rg` execution with structured argv. Regex alternation remains one argument and the runner guarantees `shell:false`. The response can project the verified executable, exact arguments, match status, repository root, changed paths, protected-path changes, bounded output, and exit status. `rg` no-match exit `1` is a completed result.
+`runMastermindCommand` supports direct read-only `rg` execution with structured argv. Regex alternation remains one argument and the runner guarantees `shell:false`. The response can project the verified executable, exact arguments, match status, repository root, changed paths, protected-path changes, bounded output, and exit status. `rg` no-match exit `1` is a completed result.
 
 The fixed `n8n_workflow_export` request is limited to the Brain source and approved workflow/artifact values. It requires an explicit backend-issued confirmation token and returns bounded artifact metadata. It cannot update, activate, delete, invoke, or deploy workflows. Confirmation-gated requests must stop until the user explicitly confirms.
 
-Runtime validation is ordered: restart Workbench, verify unified health, regenerate the schema from the healthy endpoint, re-import it, refresh the GPT, lock an exact source, and test only through the confirmation boundary. A deployment-plan safety rejection is a successful safety result, not permission to bypass the boundary.
+Runtime validation is ordered: restart Mastermind, verify unified health, regenerate the schema from the healthy endpoint, re-import it, refresh the GPT, lock an exact source, and test only through the confirmation boundary. A deployment-plan safety rejection is a successful safety result, not permission to bypass the boundary.
 
 ## Write and Git behavior
 
@@ -162,9 +162,17 @@ The schema should mark operations accurately for the Custom GPT platform.
 
 ## Legacy compatibility
 
-Use **ProChat Workbench** in public product language.
+Use **ProChat Mastermind** in public product language. The canonical Action
+operation IDs are `getMastermindStatus`, `readMastermindContext`,
+`applyMastermindFileChange`, `commitMastermindChanges`, and
+`runMastermindCommand`.
 
-The identifier **BuildFlow** may remain in:
+Older Workbench-named operation IDs and the `Workbench Private` source label
+are compatibility aliases only. Existing imports may continue to resolve them
+during migration, but new Custom GPT configuration must use the canonical
+Mastermind names and `https://mastermind.prochat.tools/api/openapi`.
+
+The identifiers **Workbench** and **BuildFlow** may remain only in:
 
 - repository and source IDs
 - legacy CLI and script aliases
@@ -176,7 +184,7 @@ Legacy `/api/actions/agent/*` routes are retired from the current public GPT sch
 
 ## Import workflow
 
-1. Start or deploy Workbench.
+1. Start or deploy Mastermind.
 2. Open the `/api/openapi` endpoint.
 3. Confirm the server URL is the HTTPS endpoint ChatGPT can reach.
 4. Import the schema into the Custom GPT action editor.

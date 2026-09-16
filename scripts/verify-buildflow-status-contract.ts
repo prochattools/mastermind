@@ -56,7 +56,7 @@ async function main() {
     const url = String(input)
     activeCalls.push(url)
     if (url.includes('/api/get-active-sources')) {
-      return new Response(JSON.stringify({ mode: 'multi', activeSourceIds: ['brain', 'prochattools-workbench'] }), {
+      return new Response(JSON.stringify({ mode: 'multi', activeSourceIds: ['brain', 'prochattools-mastermind'] }), {
         status: 200,
         headers: { 'content-type': 'application/json' }
       })

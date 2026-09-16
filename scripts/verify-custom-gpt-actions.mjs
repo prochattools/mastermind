@@ -23,11 +23,11 @@ const TARGET_ACTION_RESPONSE_BYTES = 8_000
 const HARD_ACTION_RESPONSE_BYTES = 32_000
 
 const EXPECTED_OPERATION_IDS = [
-  'getWorkbenchStatus',
-  'readWorkbenchContext',
-  'applyWorkbenchFileChange',
-  'commitWorkbenchChanges',
-  'runWorkbenchCommand'
+  'getMastermindStatus',
+  'readMastermindContext',
+  'applyMastermindFileChange',
+  'commitMastermindChanges',
+  'runMastermindCommand'
 ]
 
 const REQUIRED_ACTION_PATHS = [
@@ -106,11 +106,11 @@ function ensureOpenAiMetadataLimits(ops) {
 }
 
 function verifyStatusOperationContract(ops) {
-  const statusOp = ops.find(op => op.operationId === 'getWorkbenchStatus')
-  assert(statusOp, 'getWorkbenchStatus operation must exist')
-  assert(statusOp.routePath === '/api/actions/status', 'getWorkbenchStatus path must be /api/actions/status')
-  assert(statusOp.method === 'get', 'getWorkbenchStatus method must be GET')
-  assert(statusOp.operationId === 'getWorkbenchStatus', 'getWorkbenchStatus operationId must be stable')
+  const statusOp = ops.find(op => op.operationId === 'getMastermindStatus')
+  assert(statusOp, 'getMastermindStatus operation must exist')
+  assert(statusOp.routePath === '/api/actions/status', 'getMastermindStatus path must be /api/actions/status')
+  assert(statusOp.method === 'get', 'getMastermindStatus method must be GET')
+  assert(statusOp.operationId === 'getMastermindStatus', 'getMastermindStatus operationId must be stable')
 
   const params = statusOp.parameters || []
   const includeParam = params.find(p => p.name === 'include')
@@ -132,7 +132,7 @@ function ensureSchemaRules(schema) {
   assert(schemaBytes < MAX_SCHEMA_BYTES, `OpenAPI schema too large: ${schemaBytes} bytes`)
   assert(schema.openapi === '3.1.0', 'OpenAPI version must be exactly 3.1.0')
   assert(Array.isArray(schema.servers) && schema.servers.length === 1, 'OpenAPI must declare exactly one public server')
-  assert(schema.servers[0]?.url === 'https://workbench.prochat.tools', 'OpenAPI server must be the public Workbench origin')
+  assert(schema.servers[0]?.url === 'https://mastermind.prochat.tools', 'OpenAPI server must be the public Workbench origin')
   assert(!schema.servers.some(server => /localhost|127\.0\.0\.1/i.test(String(server?.url || ''))), 'OpenAPI must not advertise loopback servers')
   assert(schema.components && typeof schema.components === 'object' && !Array.isArray(schema.components), 'OpenAPI components must be an object')
   assert(schema.components.schemas && typeof schema.components.schemas === 'object' && !Array.isArray(schema.components.schemas), 'OpenAPI components.schemas must be an object')
@@ -168,55 +168,55 @@ function ensureSchemaRules(schema) {
   }
   assert(!schemaText.includes('/api/actions/agent/'), 'Schema must not expose agent-mode action routes')
 
-  const statusOp = ops.find(op => op.operationId === 'getWorkbenchStatus')
+  const statusOp = ops.find(op => op.operationId === 'getMastermindStatus')
   const statusDescription = `${statusOp?.summary || ''} ${statusOp?.description || ''}`.toLowerCase()
   for (const phrase of ['resume', 'continue', 'current state', 'read-only', 'does not start', 'include=active']) {
-    assert(statusDescription.includes(phrase), `getWorkbenchStatus schema must explicitly guide ${phrase} routing`)
+    assert(statusDescription.includes(phrase), `getMastermindStatus schema must explicitly guide ${phrase} routing`)
   }
-  assert(statusDescription.includes('known repository content'), 'getWorkbenchStatus must defer known repository content to readWorkbenchContext')
+  assert(statusDescription.includes('known repository content'), 'getMastermindStatus must defer known repository content to readMastermindContext')
 
-  const readContext = ops.find(op => op.operationId === 'readWorkbenchContext')
+  const readContext = ops.find(op => op.operationId === 'readMastermindContext')
   const readSchema = readContext?.requestBody?.content?.['application/json']?.schema
   const readProps = readSchema?.properties || {}
   const modes = readProps.mode?.enum || []
-  assert(readProps.mode?.description === 'Mode: prefer prepare_task_context for ordinary exploratory or multi-file work; it returns navigationEvidence and exactEvidence in one bounded packet. Use graph_context for explicit structure, exact modes for known paths/symbols. Persistent workflows use Workbench lifecycle.', 'readWorkbenchContext mode description must use lifecycle wording')
+  assert(readProps.mode?.description === 'Mode: prefer prepare_task_context for ordinary exploratory or multi-file work; it returns navigationEvidence and exactEvidence in one bounded packet. Use graph_context for explicit structure, exact modes for known paths/symbols. Persistent workflows use Mastermind lifecycle.', 'readMastermindContext mode description must use lifecycle wording')
   const instructionsText = fs.readFileSync(path.join(ROOT, 'docs/CUSTOM_GPT_INSTRUCTIONS.md'), 'utf8')
   assert(instructionsText.includes('supported read-only session bootstrap'), 'Custom GPT instructions must document the bounded session bootstrap')
   assert(instructionsText.includes('workbenchRun.sessionId'), 'Custom GPT instructions must require the returned Workbench session ID')
-  for (const phrase of ['Deterministic Resume Routing (MANDATORY)', 'MUST be exactly one', 'read-only `getWorkbenchStatus` call', 'include=active', 'chat history']) {
+  for (const phrase of ['Deterministic Resume Routing (MANDATORY)', 'MUST be exactly one', 'read-only `getMastermindStatus` call', 'include=active', 'chat history']) {
     assert(instructionsText.includes(phrase), `Custom GPT instructions must contain deterministic resume rule: ${phrase}`)
   }
   for (const phrase of ['changeType=create_run', 'never choose `resume_run` or `close_run`', 'Never infer IDs from source']) {
     assert(instructionsText.includes(phrase), `Custom GPT instructions must contain one-dispatch lifecycle guard: ${phrase}`)
   }
   for (const mode of ['grep_context', 'read_range', 'read_symbol']) {
-    assert(modes.includes(mode), `readWorkbenchContext schema missing focused mode: ${mode}`)
+    assert(modes.includes(mode), `readMastermindContext schema missing focused mode: ${mode}`)
   }
-  assert(readProps.paths?.maxItems <= 5, 'readWorkbenchContext paths must be capped at 5 for GPT use')
-  assert(readProps.limit?.maximum <= 5, 'readWorkbenchContext limit must be capped at 5 for GPT use')
-  assert(readProps.maxBytesPerFile?.maximum <= 4000, 'readWorkbenchContext maxBytesPerFile must be capped at 4000 for GPT use')
+  assert(readProps.paths?.maxItems <= 5, 'readMastermindContext paths must be capped at 5 for GPT use')
+  assert(readProps.limit?.maximum <= 5, 'readMastermindContext limit must be capped at 5 for GPT use')
+  assert(readProps.maxBytesPerFile?.maximum <= 4000, 'readMastermindContext maxBytesPerFile must be capped at 4000 for GPT use')
   assert(readProps.before?.maximum <= 40, 'grep_context before must be capped at 40')
   assert(readProps.after?.maximum <= 60, 'grep_context after must be capped at 60')
   assert(readProps.maxMatches?.maximum <= 10, 'grep_context maxMatches must be capped at 10')
-  assert(readContext.description.includes('skip status'), 'readWorkbenchContext must skip status when the source is already known')
-  assert(readContext.description.includes('Never use runWorkbenchCommand as a generic content preflight'), 'readWorkbenchContext must own ordinary content routing')
-  assert(readProps.sourceId?.description.includes('Workbench Private maps to prochattools-workbench'), 'source routing must preserve the Workbench Private exact ID mapping')
+  assert(readContext.description.includes('skip status'), 'readMastermindContext must skip status when the source is already known')
+  assert(readContext.description.includes('Never use runMastermindCommand as a generic content preflight'), 'readMastermindContext must own ordinary content routing')
+  assert(readProps.sourceId?.description.includes('Mastermind Private maps to prochattools-mastermind'), 'source routing must preserve the Workbench Private exact ID mapping')
 
-  const runCommand = ops.find(op => op.operationId === 'runWorkbenchCommand')
+  const runCommand = ops.find(op => op.operationId === 'runMastermindCommand')
   const commandContent = runCommand?.requestBody?.content?.['application/json']
   const envelopeSchema = commandContent?.schema || {}
   const envelopeProps = envelopeSchema.properties || {}
   const commandProps = envelopeProps.command?.properties || {}
   const publicCommandKinds = commandProps.commandKind?.enum || []
-  assert(!publicCommandKinds.includes('git_push'), 'runWorkbenchCommand must not expose git_push without an approved push workflow')
+  assert(!publicCommandKinds.includes('git_push'), 'runMastermindCommand must not expose git_push without an approved push workflow')
   assert(commandProps.executable?.description?.includes('explicitly allowlisted repository-supported deterministic operations'), 'run_exact_command must describe its explicit allowlist safety boundary')
-  assert((envelopeSchema.required || []).includes('version'), 'runWorkbenchCommand must require envelope version')
-  assert((envelopeSchema.required || []).includes('sessionId'), 'runWorkbenchCommand must require sessionId')
-  assert((envelopeSchema.required || []).includes('command'), 'runWorkbenchCommand must require nested command')
-  assert(envelopeProps.version?.enum?.length === 1 && envelopeProps.version.enum[0] === 2, 'runWorkbenchCommand envelope version must be exactly 2')
-  assert(commandProps.timeoutMs?.maximum <= 12000, 'runWorkbenchCommand timeoutMs must be capped at 12000')
+  assert((envelopeSchema.required || []).includes('version'), 'runMastermindCommand must require envelope version')
+  assert((envelopeSchema.required || []).includes('sessionId'), 'runMastermindCommand must require sessionId')
+  assert((envelopeSchema.required || []).includes('command'), 'runMastermindCommand must require nested command')
+  assert(envelopeProps.version?.enum?.length === 1 && envelopeProps.version.enum[0] === 2, 'runMastermindCommand envelope version must be exactly 2')
+  assert(commandProps.timeoutMs?.maximum <= 12000, 'runMastermindCommand timeoutMs must be capped at 12000')
   assert(['submit', 'status', 'cancel', 'evidence'].every(operation => (commandProps.validationJobOperation?.enum || []).includes(operation)), 'validation job operation contract must expose submit, status, cancel, and evidence')
-  assert((commandProps.commandKind?.enum || []).includes('read_evidence'), 'runWorkbenchCommand must expose the bounded read_evidence selector')
+  assert((commandProps.commandKind?.enum || []).includes('read_evidence'), 'runMastermindCommand must expose the bounded read_evidence selector')
   assert(commandProps.evidenceId?.description?.includes('not a bearer credential'), 'evidenceId must not be documented as a bearer credential')
   assert(commandProps.evidenceOwner?.additionalProperties === false, 'evidenceOwner must be strict')
   assert(commandProps.evidencePageBytes?.maximum <= 4000, 'evidence pages must be capped at 4000 bytes')
@@ -232,11 +232,11 @@ function ensureSchemaRules(schema) {
   assert(commandProps.networkAccess?.type === 'boolean', 'Generated schema networkAccess must be boolean')
   const sourceDescription = commandProps.sourceId?.description || ''
   for (const required of ['sessionId', 'default', 'workspace', 'current', 'repo']) {
-    assert(sourceDescription.includes(required), `runWorkbenchCommand sourceId guidance missing ${required}`)
+    assert(sourceDescription.includes(required), `runMastermindCommand sourceId guidance missing ${required}`)
   }
-  assert(sourceDescription.includes('Workbench Private maps to prochattools-workbench'), 'runWorkbenchCommand must preserve the Workbench Private exact ID mapping')
-  assert(runCommand.description.includes('not generic repository/content preflight'), 'runWorkbenchCommand must not be the generic repository content route')
-  assert(commandProps.commandKind.description.includes('Do not use commands as a generic content/status preflight'), 'runWorkbenchCommand commandKind must reject generic content preflight routing')
+  assert(sourceDescription.includes('Mastermind Private maps to prochattools-mastermind'), 'runMastermindCommand must preserve the Workbench Private exact ID mapping')
+  assert(runCommand.description.includes('not generic repository/content preflight'), 'runMastermindCommand must not be the generic repository content route')
+  assert(commandProps.commandKind.description.includes('Do not use commands as a generic content/status preflight'), 'runMastermindCommand commandKind must reject generic content preflight routing')
   assert(!Object.prototype.hasOwnProperty.call(commandContent || {}, 'examples'), 'Generated schema must not expose command examples')
   assert(commandProps.migration?.type === 'object' && commandProps.migration?.additionalProperties === false, 'Generated schema must expose an importer-safe strict migration object')
   assert(!['oneOf', 'anyOf', 'allOf'].some(keyword => Object.hasOwn(commandProps.migration || {}, keyword)), 'Generated schema must not hide migration fields behind schema composition')
@@ -261,7 +261,7 @@ function ensureInstructions() {
     'sourceId',
     'Quick Mode',
     'Goal Mode',
-    'Workbench lifecycle',
+    'Mastermind lifecycle',
     'Never derive sessionId from sourceId',
     'Continue only inside approved scope',
     'Never:',
@@ -450,7 +450,7 @@ function ensureFocusedModeGuardrails() {
   assert(safeAccessText.includes('evaluateConnectedRepositoryPath'), 'write policy must use the centralized connected-repository deny policy')
   assert(instructionsText.includes('Activate Workbench'), 'instructions must define natural Workbench activation')
   assert(instructionsText.includes('normalizing common separators'), 'instructions must normalize common repository-name separators')
-  assert(instructionsText.includes('workbench` matches `Workbench Private'), 'instructions must cover the hyphen/space repository-name variant')
+  assert(instructionsText.includes('mastermind` matches `Workbench Private'), 'instructions must cover the hyphen/space repository-name variant')
   assert(instructionsText.includes('Never guess between matches'), 'instructions must require explicit disambiguation')
 
   const focusedReadFile = path.join(ROOT, 'packages/cli/src/agent/focused-read.ts')
@@ -544,9 +544,9 @@ function ensureWorkbenchRunModel() {
   const applySchema = schema.paths?.['/api/actions/apply-file-change']?.post?.requestBody?.content?.['application/json']?.schema
   const changeTypes = applySchema?.properties?.changeType?.enum || []
   assert(JSON.stringify(changeTypes) === JSON.stringify(['create', 'overwrite', 'patch', 'append', 'delete_file', 'move', 'create_run', 'resume_run', 'close_run']), 'OpenAPI schema must expose direct file and bounded run-lifecycle changeTypes')
-  assert(JSON.stringify(Object.keys(applySchema?.properties || {}).sort()) === JSON.stringify(['allowMultiple', 'autoCommit', 'changeType', 'confirmationToken', 'confirmedByUser', 'content', 'documentationPath', 'dryRun', 'find', 'goal', 'goalDispatch', 'maxIterations', 'path', 'reason', 'replace', 'runId', 'sourceId', 'summary', 'to'].sort()), 'applyWorkbenchFileChange must expose only bounded file/lifecycle properties')
+  assert(JSON.stringify(Object.keys(applySchema?.properties || {}).sort()) === JSON.stringify(['allowMultiple', 'autoCommit', 'changeType', 'confirmationToken', 'confirmedByUser', 'content', 'documentationPath', 'dryRun', 'find', 'goal', 'goalDispatch', 'maxIterations', 'path', 'reason', 'replace', 'runId', 'sourceId', 'summary', 'to'].sort()), 'applyMastermindFileChange must expose only bounded file/lifecycle properties')
   const goalDispatch = applySchema?.properties?.goalDispatch
-  assert(goalDispatch?.type === 'object' && goalDispatch.additionalProperties === false, 'applyWorkbenchFileChange goalDispatch must be a strict object')
+  assert(goalDispatch?.type === 'object' && goalDispatch.additionalProperties === false, 'applyMastermindFileChange goalDispatch must be a strict object')
   assert(goalDispatch.description?.includes('readOnly=true') && goalDispatch.description?.includes('steps to []'), 'goalDispatch must explain the read-only empty-steps shape')
   assert(JSON.stringify(goalDispatch.required || []) === JSON.stringify(['version', 'expectedOutcome', 'scope', 'confirmationPolicy', 'terminalResult', 'steps']), 'goalDispatch must require its bounded dispatch manifest')
   assert(goalDispatch.properties?.version?.enum?.[0] === 1, 'goalDispatch version must be exactly 1')
@@ -558,9 +558,9 @@ function ensureWorkbenchRunModel() {
   assert(goalDispatch.properties?.commands?.maxItems <= 3, 'goalDispatch commands must be capped at 3')
   assert(goalDispatch.properties?.commit?.additionalProperties === false, 'goalDispatch commit policy must be strict')
   for (const field of ['goal', 'runId', 'summary']) {
-    assert(applySchema?.properties?.[field], `applyWorkbenchFileChange must expose lifecycle field ${field}`)
+    assert(applySchema?.properties?.[field], `applyMastermindFileChange must expose lifecycle field ${field}`)
   }
-  assert(!applySchema?.properties?.packet, 'applyWorkbenchFileChange must not expose packet state')
+  assert(!applySchema?.properties?.packet, 'applyMastermindFileChange must not expose packet state')
 
   const packetText = fs.readFileSync(path.join(ROOT, 'packages/cli/src/agent/workbench-packets.ts'), 'utf8')
   for (const required of [

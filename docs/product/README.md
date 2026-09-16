@@ -2,7 +2,8 @@
 
 This index covers the generated public Mastermind Local snapshot.
 
-The current public beta is `1.3.15-beta`. It adds exact reviewed-set recovery
+The current public beta is `1.3.25-beta`. It adds the completed Mastermind
+rebrand while preserving exact reviewed-set recovery,
 for already-reviewed safe registrations while preserving independent
 revalidation, explicit partial results, blocked ambiguity, and no automatic
 cleanup.
@@ -16,7 +17,7 @@ cleanup.
 5. [`../openapi.chatgpt/README.md`](../openapi.chatgpt/README.md) — Custom GPT action setup.
 6. [`../CUSTOM_GPT_INSTRUCTIONS.md`](../CUSTOM_GPT_INSTRUCTIONS.md) — public Custom GPT instructions.
 
-The current release also documents bounded direct `rg` search, exact command evidence, strict source locking, placeholder rejection, confirmation-gated operations, bounded doctor diagnostics, owner-approved reconciliation, reviewed-set recovery, and the fixed read-only Brain workflow export. These capabilities remain constrained by the five-action public surface. The live compatibility endpoint remains `https://workbench.prochat.tools`; the final Mastermind endpoint target is `https://mastermind.prochat.tools`.
+The current release also documents bounded direct `rg` search, exact command evidence, strict source locking, placeholder rejection, confirmation-gated operations, bounded doctor diagnostics, owner-approved reconciliation, reviewed-set recovery, and the fixed read-only Brain workflow export. These capabilities remain constrained by the five canonical Actions. The canonical endpoint is `https://mastermind.prochat.tools`; `https://workbench.prochat.tools` remains a temporary compatibility hostname.
 
 ## Public boundary
 

@@ -2,7 +2,12 @@
 
 ProChat Mastermind should stay ChatGPT-first.
 
-The self-hosted Local product should keep the existing Workbench/BuildFlow compatibility engine, source indexer, safety policy, verified writes, and fallback dashboard. The main user experience should stay in ChatGPT through Custom GPT actions, structured action responses, handoff links, and later optional embedded app surfaces outside the public Local repo.
+The self-hosted Local product should keep the existing Mastermind compatibility
+engine, source indexer, safety policy, verified writes, and fallback dashboard.
+Workbench and BuildFlow remain only as legacy compatibility names. The main
+user experience should stay in ChatGPT through Custom GPT actions, structured
+action responses, handoff links, and later optional embedded app surfaces
+outside the public Local repo.
 
 ## Current state
 
@@ -28,17 +33,17 @@ Mastermind Local already provides:
 - dynamic handoff prompts
 - first-run setup checklist
 - auto-index settings per source
-- five GPT-facing Workbench actions with short route deadlines
+- five GPT-facing Mastermind actions with short route deadlines
 - retired Agent Mode routes for stale schemas
 
-The current friction is that users still move between ChatGPT, the Workbench dashboard, and terminal tooling for validation or external execution.
+The current friction is that users still move between ChatGPT, the Mastermind dashboard, and terminal tooling for validation or external execution.
 
 ### Local speed path
 
-The native Workbench application is the selected fast path for day-to-day local
+The native Mastermind application is the selected fast path for day-to-day local
 repository goals. Custom GPT remains the conversational and remote path for
 planning, explanation, oversight, and handoff. The native path is intended to
-submit the same bounded durable Workbench goal locally, then show Activity
+submit the same bounded durable Mastermind goal locally, then show Activity
 Ledger progress, confirmation state, and the terminal result without the
 Custom GPT Action-ingress delay. This is an additional first-party surface,
 not a replacement for the five Custom GPT Actions or a second execution
@@ -46,9 +51,9 @@ engine.
 
 ## Product direction
 
-Workbench Local should treat ChatGPT as the primary workspace.
+Mastermind Local should treat ChatGPT as the primary workspace.
 
-The dashboard should stay lean and useful, but it should not become the only place to understand what is happening. Every important Workbench operation should return enough structured information for the Custom GPT to render a clean, useful response in ChatGPT.
+The dashboard should stay lean and useful, but it should not become the only place to understand what is happening. Every important Mastermind operation should return enough structured information for the Custom GPT to render a clean, useful response in ChatGPT.
 
 The goal is:
 
@@ -57,9 +62,9 @@ ChatGPT = primary interface for planning, approval, progress, and results
 Mastermind Local = local repo connector, safety engine, indexer, logs, and fallback dashboard
 ```
 
-## What belongs in self-hosted Workbench Local
+## What belongs in self-hosted Mastermind Local
 
-Self-hosted Workbench Local should remain full-featured for individual builders and local-first workflows.
+Self-hosted Mastermind Local should remain full-featured for individual builders and local-first workflows.
 
 It should include:
 
@@ -84,7 +89,7 @@ It should include:
   diagnosis without automatic cleanup
 - public docs and contribution flow
 
-Workbench Local should not be intentionally crippled. The open-source version should be useful enough to run real work end-to-end on a user's own machine.
+Mastermind Local should not be intentionally crippled. The open-source version should be useful enough to run real work end-to-end on a user's own machine.
 
 Custom GPT actions must still use explicit `sourceId` values. Dashboard active context and branch-group activation are convenience features, not implicit GPT scope.
 
@@ -108,7 +113,7 @@ If those surfaces are pursued, document and build them in the separate private r
 
 ### Phase 1: Structured action responses
 
-Make every Workbench action easy for the Custom GPT to summarize.
+Make every Mastermind action easy for the Custom GPT to summarize.
 
 Every action activity payload should expose safe, UI-ready fields:
 
@@ -121,7 +126,7 @@ Every action activity payload should expose safe, UI-ready fields:
     "safeOutputSummary": "Read 1 file.; verified=true",
     "whatHappened": ["Read 1 file."],
     "whatRemains": ["Review the returned file contents."],
-    "provenFacts": ["BuildFlow verified this result."],
+    "provenFacts": ["Mastermind verified this result."],
     "nextActions": ["Review the returned file contents."]
   }
 }
@@ -139,7 +144,7 @@ The response must stay safe: summaries should mention paths, counts, statuses, a
 
 ### Phase 2: Persistent activity history
 
-Add a local activity/event store for Workbench operations.
+Add a local activity/event store for Mastermind operations.
 
 Each action should create a safe event with:
 
@@ -186,7 +191,7 @@ A handoff can contain:
 - risk level
 - created timestamp
 
-ChatGPT can show a link to the handoff, while BuildFlow remains the local store and safety layer.
+ChatGPT can show a link to the handoff, while Mastermind remains the local store and safety layer.
 
 ### Phase 5: Confirmed local runner
 
@@ -196,7 +201,7 @@ Rules:
 
 - never auto-run from a ChatGPT link
 - show the exact command first
-- require confirmation in BuildFlow
+- require confirmation in Mastermind
 - stream or capture stdout/stderr
 - store the result as an activity event
 - keep destructive commands blocked or separately confirmed
@@ -212,7 +217,7 @@ This should be treated as a separate product surface outside the public Local re
 The Custom GPT should prefer this format after tool work:
 
 ```text
-Workbench result
+Mastermind result
 
 What I checked:
 - ...
@@ -231,11 +236,11 @@ Next actions:
 2. ...
 ```
 
-Keep it concise, structured, and grounded in Workbench action results.
+Keep it concise, structured, and grounded in Mastermind action results.
 
 ## Safety boundary
 
-BuildFlow must not expose hidden model reasoning. It should expose operational trace only:
+Mastermind must not expose hidden model reasoning. It should expose operational trace only:
 
 - actions called
 - safe inputs
@@ -258,4 +263,4 @@ This strategy is working when:
 - users rarely need to open the dashboard except for setup, source management, logs, or handoff review
 - every write has a clear preflight, confirmation, and verified result
 - every non-executable step becomes a clear handoff prompt or command card
-- Workbench Local remains useful, self-hosted, and independent
+- Mastermind Local remains useful, self-hosted, and independent

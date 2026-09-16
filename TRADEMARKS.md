@@ -2,9 +2,9 @@
 
 The software license in `LICENSE` does not grant permission to use ProChat trademarks, service marks, logos, product names, or branding except as necessary for reasonable and customary description of the software's origin.
 
-`ProChat`, `ProChat Workbench`, and associated logos and visual identities are trademarks or service marks of ProChat. `BuildFlow` is a technical and compatibility identifier used by ProChat Workbench.
+`ProChat`, `ProChat Mastermind`, and associated logos and visual identities are trademarks or service marks of ProChat. `Workbench` and `BuildFlow` are legacy technical and compatibility identifiers used by earlier Mastermind distributions.
 
-You may accurately state that an unmodified distribution is based on or compatible with ProChat Workbench. Modified distributions must not imply endorsement, sponsorship, or official status and should use branding that clearly distinguishes them from the official ProChat release.
+You may accurately state that an unmodified distribution is based on or compatible with ProChat Mastermind. Modified distributions must not imply endorsement, sponsorship, or official status and should use branding that clearly distinguishes them from the official ProChat release.
 
 Written permission is required for uses such as:
 

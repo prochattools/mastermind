@@ -2,6 +2,10 @@
 
 Status: superseded.
 
+The Workbench wording in this archived document is historical evidence from an
+earlier product phase, not current Mastermind naming or implementation
+guidance.
+
 This document previously defined ProChat Workbench as a small, bounded Fast Repo Assistant that stopped after one or two tasks and explicitly rejected agentic execution.
 
 That direction is no longer canonical.

@@ -1,6 +1,10 @@
 # ProChat Mastermind Local Public Scope
 
-This repo is for ProChat Mastermind Local only. Workbench and BuildFlow remain technical compatibility names inside the local stack until the approved cutover. The live endpoint remains `https://workbench.prochat.tools`; the final target is `https://mastermind.prochat.tools`.
+This repo is for ProChat Mastermind Local only. Mastermind is the current
+product identity. Workbench and BuildFlow remain only as explicitly labeled
+technical compatibility names. The canonical live endpoint is
+`https://mastermind.prochat.tools`; `https://workbench.prochat.tools` remains a
+temporary compatibility hostname.
 
 Allowed in this repo:
 

@@ -8,7 +8,7 @@ import {
 } from './external-delegation-store'
 import { runSafeCommand, type SafeCommandResult } from './command-runner'
 
-const EXPECTED_REPOSITORY = 'prochattools/workbench'
+const EXPECTED_REPOSITORY = 'prochattools/mastermind'
 const EXPECTED_REMOTE = 'origin'
 const EXPECTED_BASE_BRANCH = 'main'
 const FULL_COMMIT = /^[0-9a-f]{40}$/

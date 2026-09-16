@@ -1,4 +1,4 @@
-# ProChat Workbench Local Notice
+# ProChat Mastermind Local Notice
 
 Copyright (C) 2026 ProChat.
 
@@ -6,6 +6,6 @@ The generated public snapshot is licensed under the GNU Affero General Public Li
 
 This software is provided without warranty to the extent permitted by applicable law.
 
-ProChat, ProChat Workbench, and associated branding are governed by `TRADEMARKS.md`.
+ProChat, ProChat Mastermind, and associated branding are governed by `TRADEMARKS.md`.
 
 Third-party dependencies and incorporated third-party materials remain subject to their respective licenses and notices.

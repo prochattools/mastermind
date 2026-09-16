@@ -20,7 +20,7 @@ export type SourceIdentityResolution =
 
 const BUILT_IN_ALIASES: readonly SourceIdentityAlias[] = [
   {
-    legacyId: 'prochattools-workbench',
+    legacyId: 'prochattools-mastermind',
     legacyLabel: 'Workbench Private',
     canonicalId: 'prochattools-mastermind',
     canonicalLabel: 'Mastermind Private'
@@ -32,7 +32,7 @@ const BUILT_IN_ALIASES: readonly SourceIdentityAlias[] = [
     canonicalLabel: 'Mastermind'
   },
   {
-    legacyId: 'prochattools-workbench-codex-recovered-v138-provider-dra',
+    legacyId: 'prochattools-mastermind-codex-recovered-v138-provider-dra',
     legacyLabel: 'Workbench Private (codex/recovered-v138-provider-dra)',
     canonicalId: 'prochattools-mastermind-codex-recovered-v138-provider-dra',
     canonicalLabel: 'Mastermind Private (codex/recovered-v138-provider-dra)',

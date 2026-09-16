@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "sourceCommit": "2bbc8ebc3613af9d8cb77947ca62e460d2a789af",
+  "sourceCommit": "288b7c35dfca458ddbf5676afa3239608213899b",
   "files": [
     {
       "path": ".gitignore",
@@ -34,28 +34,28 @@
     },
     {
       "path": "NOTICE.md",
-      "bytes": 493,
-      "sha256": "4f150c1f44dda166cc05f15896eae9b94490f6f4ccff4dc37865e1af8b056a5c"
+      "bytes": 495,
+      "sha256": "3e15e327783316992462375948580c6821fa904f1bbbbbda4797cc5e6a2e54d7"
     },
     {
       "path": "PUBLIC-SOURCE.json",
-      "bytes": 323,
-      "sha256": "9e5d108a2dcc0cb450dd98e84628a9172266d1c7838abc02640ea83f01a24daf"
+      "bytes": 325,
+      "sha256": "d345e3a4dbbda241e0eb1ee425aeff0868013bdfea3a22b7005b22160f9be89c"
     },
     {
       "path": "README.md",
-      "bytes": 30222,
-      "sha256": "874f6da97e02f66ca1c0c5f2d43cb3c5fd7c9df01446318d347964fd5618ac33"
+      "bytes": 30240,
+      "sha256": "59d85fa2af774fbd7efc954fb472c5762fdc9f279d19f342f9db313d2527eaa5"
     },
     {
       "path": "SECURITY.md",
-      "bytes": 1631,
-      "sha256": "14f20d633288f8811431e03d6d5440b8cf91ef63715cf5e091fd58df6669b4b0"
+      "bytes": 1632,
+      "sha256": "5c6c020e5017808d1748913d3586ee0ae5ca7bc5ac1d28d67ed4cc585eb752ee"
     },
     {
       "path": "TRADEMARKS.md",
-      "bytes": 1216,
-      "sha256": "5431ecc3b201f5b01b6868918aaa2a5b14a3586d57651f134f0fe92c4ccf6133"
+      "bytes": 1256,
+      "sha256": "d53240bb11ef118b41a3dbaf8c9f4c72b09316ffb3f3cac8bd24cf6c161a41be"
     },
     {
       "path": "apps/web/.eslintrc.json",
@@ -459,8 +459,8 @@
     },
     {
       "path": "apps/web/src/app/dashboard/components/DashboardTopBar.tsx",
-      "bytes": 3520,
-      "sha256": "f5c67a12ad4c38a92e8e19786542552d43c31c2b0f52ed8799215ee3ffc0e95d"
+      "bytes": 3570,
+      "sha256": "567e65bd01b5fa6e0a0823737f7b3e47d15db61b0432566944c96d82ed79f560"
     },
     {
       "path": "apps/web/src/app/dashboard/components/ExecutionFlowPreview.tsx",
@@ -664,8 +664,8 @@
     },
     {
       "path": "apps/web/src/lib/actions/retired-agent-actions.ts",
-      "bytes": 1309,
-      "sha256": "1e05c751e9766bfb1e776e5e2e42ef7f758fc6c2140293b4607914200f8250a9"
+      "bytes": 1321,
+      "sha256": "d53728f32ed5dec45583471f1632c965a05b0172a4ddeb2edca8e7a58cf897a7"
     },
     {
       "path": "apps/web/src/lib/actions/run-command-telemetry.ts",
@@ -724,8 +724,8 @@
     },
     {
       "path": "apps/web/src/lib/openapi-chatgpt.json",
-      "bytes": 26388,
-      "sha256": "f581c219f55ebe7086251a91b4b5dda56cc49ab582c346678c007ee9fcfec210"
+      "bytes": 26393,
+      "sha256": "6f65448f0f7ca5e0630d73b8c0e2b3eae43ac8e9f7eb9492881b985fdb837161"
     },
     {
       "path": "apps/web/src/middleware.ts",
@@ -754,43 +754,43 @@
     },
     {
       "path": "docs/CUSTOM_GPT_INSTRUCTIONS.md",
-      "bytes": 7978,
-      "sha256": "17f957f89a91e2610efa5396b34201a40dbe79156a6b05d79dcef362b6610f11"
+      "bytes": 8006,
+      "sha256": "262570e81be4b4f5acd244b048071d38d986b8909f051401ec9fbb26a8524273"
     },
     {
       "path": "docs/openapi.chatgpt.json",
-      "bytes": 26388,
-      "sha256": "f581c219f55ebe7086251a91b4b5dda56cc49ab582c346678c007ee9fcfec210"
+      "bytes": 26393,
+      "sha256": "6f65448f0f7ca5e0630d73b8c0e2b3eae43ac8e9f7eb9492881b985fdb837161"
     },
     {
       "path": "docs/openapi.chatgpt/README.md",
-      "bytes": 11713,
-      "sha256": "e2260c627f3f208a456db055d842cd35d3b336b8ad5b0ecd586e0728863b2e60"
+      "bytes": 12238,
+      "sha256": "bbc8d30762db2800c59d0500e884063ac2af9368d84c03e66152676fa424eb60"
     },
     {
       "path": "docs/product/README.md",
-      "bytes": 1838,
-      "sha256": "b37a55e801962c4e656979a76b5fda135778506a4575be08b58f3e588f03376a"
+      "bytes": 1874,
+      "sha256": "d3f340c2aa9ddeac526d6a9dcf5bb30972741d99598095492a2743a6eba60378"
     },
     {
       "path": "docs/product/agent-mode.md",
-      "bytes": 2417,
-      "sha256": "f73dbc56155d24fb1eaa9e9beecf6b6058192c34af4e35a30e282ae0b5bbc379"
+      "bytes": 2578,
+      "sha256": "10c57e11557107ab4204f6225f706629e79cacc3c5619ad3ff61ceeefd53bf3e"
     },
     {
       "path": "docs/product/chatgpt-first-workflow.md",
-      "bytes": 8298,
-      "sha256": "3723ad191607e25d62c4d7dac3900470d393ba40ab5e9270a012ed42bc8b88db"
+      "bytes": 8374,
+      "sha256": "768dce80b113bbde5d0cafbbd89fdb8a7bbfb62ee8c472cdf4b9206987649149"
     },
     {
       "path": "docs/product/local/feature-scope.md",
-      "bytes": 1616,
-      "sha256": "5959145021e0b47dfd35d6991b1b6b86f853d236c7d0f97f86fe84b039fc4844"
+      "bytes": 1619,
+      "sha256": "a23561cc22b6d2f8ea5946fce4ac7255cc3ba136ae6beb78f0e2cfdf105ab83f"
     },
     {
       "path": "docs/product/public-scope.md",
-      "bytes": 1798,
-      "sha256": "8ce9c8ac74648538999e62588d28f191d1d25845f6dd1fd6a351441032ea852c"
+      "bytes": 1847,
+      "sha256": "a3fe4a800863820e4828703181d21238dbe676e849eefedafca9a21371953b60"
     },
     {
       "path": "package.json",
@@ -1189,8 +1189,8 @@
     },
     {
       "path": "packages/cli/src/agent/governed-pull-request.ts",
-      "bytes": 40882,
-      "sha256": "267de4b5010f14d0cb8de40ec3d2b321be3ee249d98c0f11059070b4656579e4"
+      "bytes": 40883,
+      "sha256": "3d8735c2f41fcc0ae309b9a6153718f4a46bd5d60e09b1325ce08079b53b2fcb"
     },
     {
       "path": "packages/cli/src/agent/graph-backend-telemetry.ts",
@@ -2739,8 +2739,8 @@
     },
     {
       "path": "packages/shared/src/mastermind-source-identity.ts",
-      "bytes": 3754,
-      "sha256": "a1f03063655e462f33a5383b4173af27299e235d5b1dbb6c715d7861fb6b0522"
+      "bytes": 3756,
+      "sha256": "9ab24ffbeebce5d46255118f8675f840873006df1be32fa2e9439fd8b0f65957"
     },
     {
       "path": "packages/shared/src/payload-budget.ts",
@@ -2909,8 +2909,8 @@
     },
     {
       "path": "scripts/verify-buildflow-status-contract.ts",
-      "bytes": 4843,
-      "sha256": "4edd00b253867d7f2ab29c45f27059bcdceb8918e112e0cc960eb855ecef1ede"
+      "bytes": 4844,
+      "sha256": "5b87ab41cd2a676df8a73e82bacb6ce7a8757ec3e4578eba75ae607b00b3ae1f"
     },
     {
       "path": "scripts/verify-capability-grants.ts",
@@ -2964,8 +2964,8 @@
     },
     {
       "path": "scripts/verify-custom-gpt-actions.mjs",
-      "bytes": 62906,
-      "sha256": "67e82023d01df4baddbee4c3b5496fc2d212a62a68675615f02a0c1c35eef5a9"
+      "bytes": 62955,
+      "sha256": "4c865ea206182568874b8cc12c4dea9c74a57e7540c1166071c5be78714dda48"
     },
     {
       "path": "scripts/verify-dashboard.mjs",

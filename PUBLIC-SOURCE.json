@@ -1,11 +1,11 @@
 {
   "schemaVersion": 1,
-  "product": "ProChat Workbench Local",
+  "product": "ProChat Mastermind Local",
   "version": "1.3.25-beta",
-  "sourceCommit": "2bbc8ebc3613af9d8cb77947ca62e460d2a789af",
-  "exportedAt": "2026-09-16T17:54:41+01:00",
+  "sourceCommit": "288b7c35dfca458ddbf5676afa3239608213899b",
+  "exportedAt": "2026-09-16T19:23:08+01:00",
   "exportFormatVersion": 1,
   "license": "AGPL-3.0-only",
-  "publicScope": "Workbench Local",
+  "publicScope": "Mastermind Local",
   "automaticPublish": false
 }

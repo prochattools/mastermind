@@ -1,6 +1,6 @@
-# ProChat Workbench Local Feature Scope
+# ProChat Mastermind Local Feature Scope
 
-Current and planned Workbench Local features:
+Current and planned Mastermind Local features:
 
 - source management
 - branch-aware grouping for configured Git checkouts and linked worktrees
@@ -33,5 +33,5 @@ Current and planned Workbench Local features:
   controller-owned promotion, restart, health verification, and rollback
 - local docs and contribution flow
 
-This list is for Workbench Local only.
+This list is for Mastermind Local only.
 It does not include paid, hosted, SaaS, Pro, managed, commercial, billing, account, team, or private roadmap items.
