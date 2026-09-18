@@ -287,6 +287,7 @@ export function compileAndPersistRoadmapToRun(params: {
         }
       : {
           status: 'blocked',
+          blockedDisposition: 'resumable',
           activePacketId: undefined,
           requiresConfirmation: false,
           confirmationReason: undefined,

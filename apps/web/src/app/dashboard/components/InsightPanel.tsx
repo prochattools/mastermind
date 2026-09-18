@@ -77,9 +77,8 @@ export function InsightPanel({
   const titleBySection: Record<DashboardSection, string> = {
     overview: 'Inspector',
     sources: 'Sources',
+    'goal-run': 'Goal / Run',
     activity: 'Activity',
-    plan: 'Plans',
-    handoff: 'Handoff',
     settings: 'Settings'
   }
 
@@ -210,7 +209,7 @@ export function InsightPanel({
           <div className="space-y-2">
             {shownActivity.length === 0 ? (
               <div className="rounded-[14px] border border-dashed border-bf-border/60 bg-bf-subtle/35 px-3 py-3 text-[12px] leading-5 text-bf-muted dark:border-slate-800/60 dark:bg-slate-950/24 dark:text-slate-300">
-                BuildFlow activity will appear here.
+                Mastermind activity will appear here.
               </div>
             ) : (
               shownActivity.map((entry, index) => (
@@ -225,27 +224,14 @@ export function InsightPanel({
             )}
           </div>
         )
-      case 'plan':
+      case 'goal-run':
         return (
           <div className="space-y-3">
-            <DashboardMetaRow label="Plan" value={localPlan ? localPlan.title : 'Not loaded yet'} className="text-[12px]" />
-            <DashboardMetaRow label="Progress" value={localPlan ? `${doneTaskCount}/${localPlan.tasks.length} done` : 'No tasks'} className="text-[12px]" />
-            <div className="rounded-[14px] bg-bf-subtle/35 px-3 py-2.5 ring-1 ring-inset ring-bf-border/35 dark:bg-slate-950/24 dark:ring-slate-800/50">
-              <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-bf-muted dark:text-slate-400">Next task</div>
-              <div className="mt-1 truncate text-[12px] font-medium text-bf-text dark:text-slate-100">{nextPlanTask?.title || 'Create a local plan'}</div>
-              <div className="mt-0.5 line-clamp-2 text-[12px] text-bf-muted dark:text-slate-300">{nextPlanTask?.detail || 'Review sources, then create a local execution plan.'}</div>
-            </div>
-          </div>
-        )
-      case 'handoff':
-        return (
-          <div className="space-y-3">
-            <DashboardMetaRow label="Codex" value={<DashboardCodeText>Scoped review</DashboardCodeText>} className="text-[12px]" />
-            <DashboardMetaRow label="Plan" value={localPlan ? `${doneTaskCount}/${localPlan.tasks.length} done` : 'No local plan'} className="text-[12px]" />
-            <DashboardMetaRow label="Claude" value={<DashboardCodeText>Long-context orchestration</DashboardCodeText>} className="text-[12px]" />
+            <DashboardMetaRow label="Goal" value={localPlan ? localPlan.title : 'No active goal'} className="text-[12px]" />
+            <DashboardMetaRow label="Progress" value={localPlan ? `${doneTaskCount}/${localPlan.tasks.length} done` : 'No run yet'} className="text-[12px]" />
             <div className="rounded-md border border-bf-border/60 bg-bf-subtle/40 px-3 py-2 dark:border-slate-800/70 dark:bg-slate-950/35">
-              <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-bf-muted dark:text-slate-400">Copy tip</div>
-              <div className="mt-1 text-[12px] text-bf-muted dark:text-slate-300">Use the compact copy buttons in the main Handoff panel.</div>
+              <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-bf-muted dark:text-slate-400">Next</div>
+              <div className="mt-1 text-[12px] text-bf-muted dark:text-slate-300">{nextPlanTask?.title || 'Start a bounded goal from the active source.'}</div>
             </div>
           </div>
         )

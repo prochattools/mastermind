@@ -1,7 +1,7 @@
 # Mastermind Local documentation
 
 This directory is the public product guide for the self-hosted Mastermind
-Local snapshot. The current beta is `1.3.25-beta`.
+Local snapshot. The current beta is `2.0.0-beta`.
 
 ## Start here
 
@@ -21,10 +21,12 @@ Local snapshot. The current beta is `1.3.25-beta`.
 
 ## Public boundary
 
-Mastermind Local contains the local runtime, dashboard, CLI, native macOS
-surface, public action schema, and contribution documentation needed for
-user-owned workflows. Private operational material, internal release controls,
-and non-public product planning are intentionally not exported.
+Mastermind Local contains the local runtime, menu-bar-first native macOS
+companion, advanced dashboard/CLI surfaces, public action schema, and
+contribution documentation needed for user-owned workflows. ChatGPT is the
+normal conversation and work-initiation surface; discovery and indexing are
+automatic in the native path. Private operational material, internal release
+controls, and non-public product planning are intentionally not exported.
 
 The public source is licensed under `AGPL-3.0-only`. See the repository root
 for licensing, security, and contribution information.

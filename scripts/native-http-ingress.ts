@@ -15,7 +15,17 @@ export const NATIVE_INGRESS_MAX_RESPONSE_BYTES = GPT_ACTION_RESPONSE_BYTE_LIMIT
 export const NATIVE_INGRESS_REQUEST_ID_MAX_LENGTH = 200
 export const NATIVE_INGRESS_DEFAULT_MAX_ACTIVE_REQUESTS = 8
 const NATIVE_INGRESS_DEFAULT_DEADLINE_MS = 12_000
-const NATIVE_INGRESS_OWNER_CONFIG_DIR = path.join(process.env.HOME || process.env.USERPROFILE || '/tmp', '.config', 'workbench')
+const NATIVE_INGRESS_OWNER_HOME = process.env.HOME || process.env.USERPROFILE || '/tmp'
+
+function resolveNativeIngressOwnerConfigDir(homeDir = NATIVE_INGRESS_OWNER_HOME): string {
+  const canonical = path.join(homeDir, '.config', 'mastermind')
+  const legacy = path.join(homeDir, '.config', 'workbench')
+  return fs.existsSync(path.join(canonical, 'runtime.env')) || !fs.existsSync(path.join(legacy, 'runtime.env'))
+    ? canonical
+    : legacy
+}
+
+const NATIVE_INGRESS_OWNER_CONFIG_DIR = resolveNativeIngressOwnerConfigDir()
 
 type NativeIngressRoute = {
   method: 'GET' | 'POST'
@@ -54,6 +64,17 @@ type NativeIngressLogEntry = {
   operationId?: WorkbenchOperationId
   method?: string
   path?: string
+  host?: string
+  userAgent?: string
+  accept?: string
+  requestContentType?: string
+  responseContentType?: string
+  authorizationPresent?: boolean
+  authScheme?: string
+  bearerTokenLength?: number
+  bearerTokenFingerprint?: string
+  configuredTokenFingerprint?: string
+  authDecision?: 'accepted' | 'missing' | 'invalid_scheme' | 'mismatch' | 'server_config_invalid'
   phase?: string
   status?: number
   elapsedMs?: number
@@ -73,7 +94,13 @@ type NativeResponseMetadata = {
   status: number
   responseBytes: number
   responseSha256: string
+  responseContentType: 'application/json'
 }
+
+type NativeRequestDiagnostics = Pick<NativeIngressLogEntry,
+  'host' | 'userAgent' | 'accept' | 'requestContentType' | 'authorizationPresent' | 'authScheme' |
+  'bearerTokenLength' | 'bearerTokenFingerprint' | 'configuredTokenFingerprint' | 'authDecision'
+>
 
 function appendIngressLog(logFilePath: string, entry: NativeIngressLogEntry): void {
   try {
@@ -83,6 +110,41 @@ function appendIngressLog(logFilePath: string, entry: NativeIngressLogEntry): vo
     fs.chmodSync(logFilePath, 0o600)
   } catch {
     // Diagnostics must never make the action path fail.
+  }
+}
+
+function safeHeaderValue(value: string | string[] | undefined, maxLength = 256): string | undefined {
+  const raw = Array.isArray(value) ? value[0] : value
+  if (typeof raw !== 'string') return undefined
+  return raw.replace(/[\u0000-\u001f\u007f]/g, '?').slice(0, maxLength)
+}
+
+function tokenFingerprint(value: string | undefined): string | undefined {
+  return value === undefined ? undefined : crypto.createHash('sha256').update(value, 'utf8').digest('hex').slice(0, 12)
+}
+
+function requestHeaderDiagnostics(req: http.IncomingMessage): NativeRequestDiagnostics {
+  const authorization = req.headers.authorization as string | string[] | undefined
+  const authorizationPresent = typeof authorization === 'string'
+    ? authorization.length > 0
+    : Array.isArray(authorization) && authorization.length > 0
+  const authScheme = typeof authorization === 'string'
+    ? safeHeaderValue(authorization.split(/\s+/, 1)[0], 32)
+    : undefined
+  const bearerToken = typeof authorization === 'string' && authorization.startsWith('Bearer ')
+    ? authorization.slice(7)
+    : undefined
+  return {
+    host: safeHeaderValue(req.headers.host, 255),
+    userAgent: safeHeaderValue(req.headers['user-agent']),
+    accept: safeHeaderValue(req.headers.accept),
+    requestContentType: safeHeaderValue(req.headers['content-type']),
+    authorizationPresent,
+    ...(authScheme ? { authScheme } : {}),
+    ...(bearerToken !== undefined ? {
+      bearerTokenLength: bearerToken.length,
+      bearerTokenFingerprint: tokenFingerprint(bearerToken)
+    } : {})
   }
 }
 
@@ -107,9 +169,10 @@ function loadOwnerToken(configDir: string): string | null {
   let content: string
   try { content = fs.readFileSync(runtimeEnvPath, 'utf8') } catch { return null }
   const lines = content.split('\n').filter(l => l.trim() && !l.startsWith('#'))
-  const tokenLines = lines.filter(l => l.startsWith('WORKBENCH_ACTION_TOKEN='))
+  const tokenLines = lines.filter(l => l.startsWith('MASTERMIND_ACTION_TOKEN=') || l.startsWith('WORKBENCH_ACTION_TOKEN='))
   if (tokenLines.length !== 1) return null
-  const token = tokenLines[0].slice('WORKBENCH_ACTION_TOKEN='.length).trim()
+  const separator = tokenLines[0].indexOf('=')
+  const token = tokenLines[0].slice(separator + 1).trim()
   if (token.length < 16 || token.length > 4096 || /[\r\n\0]/.test(token)) return null
   return token
 }
@@ -122,18 +185,20 @@ function timingSafeEqual(a: string, b: string): boolean {
   return crypto.timingSafeEqual(Buffer.from(a, 'utf8'), Buffer.from(b, 'utf8'))
 }
 
-function authenticateRequest(req: http.IncomingMessage, configDir: string): { valid: boolean; status?: number; body?: unknown } {
+function authenticateRequest(req: http.IncomingMessage, configDir: string): { valid: boolean; status?: number; body?: unknown; diagnostics: NativeRequestDiagnostics } {
   const token = loadOwnerToken(configDir)
-  if (!token) return { valid: false, status: 500, body: { error: 'Server configuration error: WORKBENCH_ACTION_TOKEN not set' } }
+  const headers = requestHeaderDiagnostics(req)
+  if (!token) return { valid: false, status: 500, body: { error: 'Server configuration error: action token not set' }, diagnostics: { ...headers, authDecision: 'server_config_invalid' } }
   const authHeader = req.headers['authorization']
   if (!authHeader || typeof authHeader !== 'string' || !authHeader.startsWith('Bearer ')) {
-    return { valid: false, status: 401, body: { error: 'Unauthorized' } }
+    return { valid: false, status: 401, body: { error: 'Unauthorized' }, diagnostics: { ...headers, configuredTokenFingerprint: tokenFingerprint(token), authDecision: authHeader ? 'invalid_scheme' : 'missing' } }
   }
   const candidate = authHeader.slice(7)
+  const diagnostics = { ...headers, configuredTokenFingerprint: tokenFingerprint(token), authDecision: 'mismatch' as const }
   if (!timingSafeEqual(candidate, token)) {
-    return { valid: false, status: 401, body: { error: 'Unauthorized' } }
+    return { valid: false, status: 401, body: { error: 'Unauthorized' }, diagnostics }
   }
-  return { valid: true }
+  return { valid: true, diagnostics: { ...diagnostics, authDecision: 'accepted' } }
 }
 
 function readBody(req: http.IncomingMessage, maxBytes: number, timeoutMs: number): Promise<Buffer> {
@@ -208,7 +273,7 @@ function jsonResponse(res: http.ServerResponse, status: number, body: unknown, r
   const responseSha256 = crypto.createHash('sha256').update(responsePayload, 'utf8').digest('hex')
   res.writeHead(responseStatus, { 'Content-Type': 'application/json', 'Content-Length': responseBytes.toString(), 'Cache-Control': 'no-store' })
   res.end(responsePayload)
-  return { status: responseStatus, responseBytes, responseSha256 }
+  return { status: responseStatus, responseBytes, responseSha256, responseContentType: 'application/json' }
 }
 
 function buildOpenApiSchema() {
@@ -266,10 +331,21 @@ export function createNativeIngress(config: NativeIngressConfig): { server: http
     let sessionId: string | undefined
     const operationId = route?.operationId || undefined
     let responseMetadata: NativeResponseMetadata | undefined
+    let requestDiagnostics: NativeRequestDiagnostics = requestHeaderDiagnostics(req)
+    const appendRequestLog = (entry: NativeIngressLogEntry): void => appendIngressLog(logFilePath, { ...requestDiagnostics, ...entry })
+
+    appendRequestLog({
+      event: 'request_received',
+      requestId,
+      operationId,
+      method,
+      path: pathname,
+      phase: 'received'
+    })
 
     const sendJson = (status: number, body: unknown, responseRequestId?: string): void => {
       responseMetadata = jsonResponse(res, status, body, responseRequestId)
-      appendIngressLog(logFilePath, {
+      appendRequestLog({
         event: 'response_write',
         requestId,
         operationId,
@@ -283,6 +359,7 @@ export function createNativeIngress(config: NativeIngressConfig): { server: http
         sessionId,
         responseBytes: responseMetadata.responseBytes,
         responseSha256: responseMetadata.responseSha256,
+        responseContentType: responseMetadata.responseContentType,
         responseEnded: res.writableEnded,
         responseFinished: res.writableFinished,
         responseDestroyed: res.destroyed
@@ -290,7 +367,7 @@ export function createNativeIngress(config: NativeIngressConfig): { server: http
     }
 
     const appendResponseLifecycle = (event: 'response_finish' | 'response_close', phase: string): void => {
-      appendIngressLog(logFilePath, {
+      appendRequestLog({
         event,
         requestId,
         operationId,
@@ -304,7 +381,8 @@ export function createNativeIngress(config: NativeIngressConfig): { server: http
         sessionId,
         ...(responseMetadata ? {
           responseBytes: responseMetadata.responseBytes,
-          responseSha256: responseMetadata.responseSha256
+          responseSha256: responseMetadata.responseSha256,
+          responseContentType: responseMetadata.responseContentType
         } : {}),
         responseEnded: res.writableEnded,
         responseFinished: res.writableFinished,
@@ -331,8 +409,9 @@ export function createNativeIngress(config: NativeIngressConfig): { server: http
     }
 
     const auth = authenticateRequest(req, configDir)
+    requestDiagnostics = { ...requestDiagnostics, ...auth.diagnostics }
     if (!auth.valid) {
-      appendIngressLog(logFilePath, { event: 'request_rejected', requestId, method, path: pathname, phase: 'authentication', status: auth.status, elapsedMs: Date.now() - requestStartedAt, activeRequests })
+      appendRequestLog({ event: 'request_rejected', requestId, method, path: pathname, phase: 'authentication', status: auth.status, elapsedMs: Date.now() - requestStartedAt, activeRequests })
       res.setHeader('X-Workbench-Request-Id', requestId)
       const authBody = auth.body && typeof auth.body === 'object' && !Array.isArray(auth.body)
         ? { ...(auth.body as Record<string, unknown>), requestId }
@@ -357,11 +436,11 @@ export function createNativeIngress(config: NativeIngressConfig): { server: http
         const body = diagnostics && typeof diagnostics === 'object' && !Array.isArray(diagnostics)
           ? { ...(diagnostics as Record<string, unknown>), requestId }
           : { ok: true, requestId, diagnostics }
-        appendIngressLog(logFilePath, { event: 'local_diagnostics', requestId, method, path: pathname, phase: 'response_ready', status: 200, elapsedMs: Date.now() - requestStartedAt, activeRequests })
+        appendRequestLog({ event: 'local_diagnostics', requestId, method, path: pathname, phase: 'response_ready', status: 200, elapsedMs: Date.now() - requestStartedAt, activeRequests })
         res.setHeader('X-Workbench-Request-Id', requestId)
         sendJson(200, body, requestId)
       } catch (error) {
-        appendIngressLog(logFilePath, { event: 'request_error', requestId, method, path: pathname, phase: 'local_diagnostics', status: 500, elapsedMs: Date.now() - requestStartedAt, activeRequests, errorMessage: error instanceof Error ? error.message : String(error) })
+        appendRequestLog({ event: 'request_error', requestId, method, path: pathname, phase: 'local_diagnostics', status: 500, elapsedMs: Date.now() - requestStartedAt, activeRequests, errorMessage: error instanceof Error ? error.message : String(error) })
         res.setHeader('X-Workbench-Request-Id', requestId)
         sendJson(500, { ok: false, requestId, error: { code: 'local_diagnostics_failed', message: 'Local diagnostics could not be collected.' } }, requestId)
       }
@@ -384,16 +463,16 @@ export function createNativeIngress(config: NativeIngressConfig): { server: http
         }
       } catch (err) {
         if (err instanceof Error && err.message === 'request_body_too_large') {
-          appendIngressLog(logFilePath, { event: 'request_rejected', requestId, operationId, method, path: pathname, phase: 'request_body_too_large', status: 413, elapsedMs: Date.now() - requestStartedAt, activeRequests })
+          appendRequestLog({ event: 'request_rejected', requestId, operationId, method, path: pathname, phase: 'request_body_too_large', status: 413, elapsedMs: Date.now() - requestStartedAt, activeRequests })
           res.setHeader('X-Workbench-Request-Id', requestId)
           sendJson(413, { error: 'Request body too large', requestId }, requestId)
         } else if (err instanceof Error && err.message === 'request_body_timeout') {
-          appendIngressLog(logFilePath, { event: 'deadline_exceeded', requestId, operationId, method, path: pathname, phase: 'request_body', status: 200, elapsedMs: Date.now() - requestStartedAt, activeRequests })
+          appendRequestLog({ event: 'deadline_exceeded', requestId, operationId, method, path: pathname, phase: 'request_body', status: 200, elapsedMs: Date.now() - requestStartedAt, activeRequests })
           res.setHeader('X-Workbench-Request-Id', requestId)
           res.setHeader('X-Workbench-Deadline-Phase', 'request_body')
           sendJson(200, { ok: false, status: 'timeout', requestId, error: { code: 'deadline_exceeded', message: `Workbench request body exceeded its ${deadlineMs}ms response deadline.`, retryable: false } })
         } else {
-          appendIngressLog(logFilePath, { event: 'request_rejected', requestId, operationId, method, path: pathname, phase: 'invalid_json', status: 400, elapsedMs: Date.now() - requestStartedAt, activeRequests })
+          appendRequestLog({ event: 'request_rejected', requestId, operationId, method, path: pathname, phase: 'invalid_json', status: 400, elapsedMs: Date.now() - requestStartedAt, activeRequests })
           res.setHeader('X-Workbench-Request-Id', requestId)
           sendJson(400, { error: 'Invalid JSON body', requestId }, requestId)
         }
@@ -407,7 +486,7 @@ export function createNativeIngress(config: NativeIngressConfig): { server: http
     sourceId = typeof (payload as Record<string, unknown>)?.sourceId === 'string' ? (payload as Record<string, unknown>).sourceId as string : undefined
     sessionId = typeof (payload as Record<string, unknown>)?.sessionId === 'string' ? (payload as Record<string, unknown>).sessionId as string : undefined
     if (activeRequests >= maxActiveRequests && operationId !== 'getWorkbenchStatus') {
-      appendIngressLog(logFilePath, { event: 'request_rejected', requestId, operationId, method, path: pathname, phase: 'backpressure', status: 429, elapsedMs: Date.now() - requestStartedAt, activeRequests, sourceId, sessionId })
+      appendRequestLog({ event: 'request_rejected', requestId, operationId, method, path: pathname, phase: 'backpressure', status: 429, elapsedMs: Date.now() - requestStartedAt, activeRequests, sourceId, sessionId })
       res.setHeader('X-Workbench-Request-Id', requestId)
       res.setHeader('Retry-After', '1')
       sendJson(429, { ok: false, status: 'blocked', requestId, error: { code: 'backpressure_overloaded', message: 'Workbench is busy with bounded operations. Retry this request after the active work drains.', retryable: true, retryAfterMs: 1_000 } }, requestId)
@@ -421,32 +500,32 @@ export function createNativeIngress(config: NativeIngressConfig): { server: http
         admission = beginNativeRequest({ configDir, requestId, fingerprint, operationId: actionOperationId, sourceId, sessionId })
       } catch (error) {
         const message = error instanceof NativeRequestLedgerError ? error.message : 'Native mutation request ledger is unavailable; retry after recovery.'
-        appendIngressLog(logFilePath, { event: 'request_rejected', requestId, operationId, method, path: pathname, phase: 'request_ledger', status: 503, elapsedMs: Date.now() - requestStartedAt, activeRequests, sourceId, sessionId, errorMessage: message })
+        appendRequestLog({ event: 'request_rejected', requestId, operationId, method, path: pathname, phase: 'request_ledger', status: 503, elapsedMs: Date.now() - requestStartedAt, activeRequests, sourceId, sessionId, errorMessage: message })
         res.setHeader('X-Workbench-Request-Id', requestId)
         sendJson(503, { ok: false, status: 'blocked', requestId, error: { code: 'request_ledger_unavailable', message, retryable: false } }, requestId)
         return
       }
       if (admission.decision === 'conflict') {
-        appendIngressLog(logFilePath, { event: 'request_rejected', requestId, operationId, method, path: pathname, phase: 'request_id_conflict', status: 409, elapsedMs: Date.now() - requestStartedAt, activeRequests, sourceId, sessionId })
+        appendRequestLog({ event: 'request_rejected', requestId, operationId, method, path: pathname, phase: 'request_id_conflict', status: 409, elapsedMs: Date.now() - requestStartedAt, activeRequests, sourceId, sessionId })
         res.setHeader('X-Workbench-Request-Id', requestId)
         sendJson(409, { ok: false, status: 'blocked', requestId, error: { code: 'request_id_conflict', message: 'The request ID was already used for a different mutation.', retryable: false } }, requestId)
         return
       }
       if (admission.decision === 'in_flight') {
-        appendIngressLog(logFilePath, { event: 'request_rejected', requestId, operationId, method, path: pathname, phase: 'request_in_flight', status: 200, elapsedMs: Date.now() - requestStartedAt, activeRequests, sourceId, sessionId })
+        appendRequestLog({ event: 'request_rejected', requestId, operationId, method, path: pathname, phase: 'request_in_flight', status: 200, elapsedMs: Date.now() - requestStartedAt, activeRequests, sourceId, sessionId })
         res.setHeader('X-Workbench-Request-Id', requestId)
         sendJson(200, { ok: false, status: 'blocked', requestId, error: { code: 'request_in_flight', message: 'This mutation is still in flight or its outcome is ambiguous. Reconcile the original request before retrying.', retryable: false } }, requestId)
         return
       }
       if (admission.decision === 'replay') {
-        appendIngressLog(logFilePath, { event: 'request_replay', requestId, operationId, method, path: pathname, phase: 'terminal_outcome_replayed', status: admission.record.httpStatus, elapsedMs: Date.now() - requestStartedAt, activeRequests, sourceId, sessionId })
+        appendRequestLog({ event: 'request_replay', requestId, operationId, method, path: pathname, phase: 'terminal_outcome_replayed', status: admission.record.httpStatus, elapsedMs: Date.now() - requestStartedAt, activeRequests, sourceId, sessionId })
         res.setHeader('X-Workbench-Request-Id', requestId)
         res.setHeader('X-Workbench-Deadline-Phase', 'replayed')
         sendJson(admission.record.httpStatus || 200, admission.record.responseBody, requestId)
         return
       }
       if (admission.decision === 'recorded_without_body') {
-        appendIngressLog(logFilePath, { event: 'request_replay', requestId, operationId, method, path: pathname, phase: 'terminal_outcome_without_body', status: 200, elapsedMs: Date.now() - requestStartedAt, activeRequests, sourceId, sessionId })
+        appendRequestLog({ event: 'request_replay', requestId, operationId, method, path: pathname, phase: 'terminal_outcome_without_body', status: 200, elapsedMs: Date.now() - requestStartedAt, activeRequests, sourceId, sessionId })
         res.setHeader('X-Workbench-Request-Id', requestId)
         res.setHeader('X-Workbench-Deadline-Phase', 'reconciled')
         sendJson(200, { ok: false, status: 'blocked', requestId, error: { code: 'request_outcome_recorded', message: 'The mutation already reached a terminal outcome, but its response was too large to replay. Do not retry it; reconcile the durable run or packet result.', retryable: false } }, requestId)
@@ -455,7 +534,7 @@ export function createNativeIngress(config: NativeIngressConfig): { server: http
     }
     activeRequests += 1
     peakActiveRequests = Math.max(peakActiveRequests, activeRequests)
-    appendIngressLog(logFilePath, { event: 'request_start', requestId, operationId, method, path: pathname, phase: 'dispatch_pending', activeRequests, sourceId, sessionId })
+    appendRequestLog({ event: 'request_start', requestId, operationId, method, path: pathname, phase: 'dispatch_pending', activeRequests, sourceId, sessionId })
     const controller = new AbortController()
     let timeout: NodeJS.Timeout | undefined
     try {
@@ -471,11 +550,11 @@ export function createNativeIngress(config: NativeIngressConfig): { server: http
               responseBody: result.body
             })
           } catch (error) {
-            appendIngressLog(logFilePath, { event: 'request_error', requestId, operationId, method, path: pathname, phase: 'request_ledger_complete', status: 500, elapsedMs: Date.now() - requestStartedAt, activeRequests, sourceId, sessionId, errorMessage: error instanceof Error ? error.message : String(error) })
+            appendRequestLog({ event: 'request_error', requestId, operationId, method, path: pathname, phase: 'request_ledger_complete', status: 500, elapsedMs: Date.now() - requestStartedAt, activeRequests, sourceId, sessionId, errorMessage: error instanceof Error ? error.message : String(error) })
           }
         }
         if (controller.signal.aborted) {
-          appendIngressLog(logFilePath, { event: 'late_completion', requestId, operationId, method, path: pathname, phase: 'completed_after_timeout', status: result.status, elapsedMs: Date.now() - requestStartedAt, activeRequests, sourceId, sessionId })
+          appendRequestLog({ event: 'late_completion', requestId, operationId, method, path: pathname, phase: 'completed_after_timeout', status: result.status, elapsedMs: Date.now() - requestStartedAt, activeRequests, sourceId, sessionId })
         }
       }).catch(error => {
         if (mutation) {
@@ -488,17 +567,17 @@ export function createNativeIngress(config: NativeIngressConfig): { server: http
               responseBody: { ok: false, status: 'error', requestId, error: { code: 'NATIVE_INGRESS_INTERNAL', message: error instanceof Error ? error.message : 'Internal error' } }
             })
           } catch (ledgerError) {
-            appendIngressLog(logFilePath, { event: 'request_error', requestId, operationId, method, path: pathname, phase: 'request_ledger_complete', status: 500, elapsedMs: Date.now() - requestStartedAt, activeRequests, sourceId, sessionId, errorMessage: ledgerError instanceof Error ? ledgerError.message : String(ledgerError) })
+            appendRequestLog({ event: 'request_error', requestId, operationId, method, path: pathname, phase: 'request_ledger_complete', status: 500, elapsedMs: Date.now() - requestStartedAt, activeRequests, sourceId, sessionId, errorMessage: ledgerError instanceof Error ? ledgerError.message : String(ledgerError) })
           }
         }
         if (controller.signal.aborted) {
-          appendIngressLog(logFilePath, { event: 'late_failure', requestId, operationId, method, path: pathname, phase: 'failed_after_timeout', elapsedMs: Date.now() - requestStartedAt, activeRequests, sourceId, sessionId, errorMessage: error instanceof Error ? error.message : String(error) })
+          appendRequestLog({ event: 'late_failure', requestId, operationId, method, path: pathname, phase: 'failed_after_timeout', elapsedMs: Date.now() - requestStartedAt, activeRequests, sourceId, sessionId, errorMessage: error instanceof Error ? error.message : String(error) })
         }
       })
       const timeoutResult = new Promise<{ status: number; body: unknown }>(resolve => {
         timeout = setTimeout(() => {
           controller.abort()
-          appendIngressLog(logFilePath, { event: 'deadline_exceeded', requestId, operationId, method, path: pathname, phase: 'deadline_exceeded', status: 200, elapsedMs: Date.now() - requestStartedAt, activeRequests, sourceId, sessionId })
+          appendRequestLog({ event: 'deadline_exceeded', requestId, operationId, method, path: pathname, phase: 'deadline_exceeded', status: 200, elapsedMs: Date.now() - requestStartedAt, activeRequests, sourceId, sessionId })
           resolve({
             status: 200,
             body: {
@@ -528,15 +607,15 @@ export function createNativeIngress(config: NativeIngressConfig): { server: http
             responseBody: result.body
           })
         } catch (error) {
-          appendIngressLog(logFilePath, { event: 'request_error', requestId, operationId, method, path: pathname, phase: 'request_ledger_complete', status: 500, elapsedMs: Date.now() - requestStartedAt, activeRequests, sourceId, sessionId, errorMessage: error instanceof Error ? error.message : String(error) })
+          appendRequestLog({ event: 'request_error', requestId, operationId, method, path: pathname, phase: 'request_ledger_complete', status: 500, elapsedMs: Date.now() - requestStartedAt, activeRequests, sourceId, sessionId, errorMessage: error instanceof Error ? error.message : String(error) })
         }
       }
-      appendIngressLog(logFilePath, { event: 'request_finish', requestId, operationId, method, path: pathname, phase: controller.signal.aborted ? 'timeout_response' : 'response_ready', status: result.status, elapsedMs: Date.now() - requestStartedAt, activeRequests, sourceId, sessionId })
+      appendRequestLog({ event: 'request_finish', requestId, operationId, method, path: pathname, phase: controller.signal.aborted ? 'timeout_response' : 'response_ready', status: result.status, elapsedMs: Date.now() - requestStartedAt, activeRequests, sourceId, sessionId })
       res.setHeader('X-Workbench-Request-Id', requestId)
       res.setHeader('X-Workbench-Deadline-Phase', controller.signal.aborted ? 'deadline_exceeded' : 'response_ready')
       sendJson(result.status, result.body, requestId)
     } catch (err) {
-      appendIngressLog(logFilePath, { event: 'request_error', requestId, operationId, method, path: pathname, phase: 'internal_error', status: 500, elapsedMs: Date.now() - requestStartedAt, activeRequests, sourceId, sessionId, errorMessage: err instanceof Error ? err.message : String(err) })
+      appendRequestLog({ event: 'request_error', requestId, operationId, method, path: pathname, phase: 'internal_error', status: 500, elapsedMs: Date.now() - requestStartedAt, activeRequests, sourceId, sessionId, errorMessage: err instanceof Error ? err.message : String(err) })
       res.setHeader('X-Workbench-Request-Id', requestId)
       sendJson(500, { ok: false, requestId, error: { code: 'NATIVE_INGRESS_INTERNAL', message: err instanceof Error ? err.message : 'Internal error' } }, requestId)
     } finally {

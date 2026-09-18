@@ -46,11 +46,14 @@ import { resolveActiveProviders } from '../../../mcp/dist/provider-activation.js
 import { loadConfiguredProviderRuntime } from '../../../mcp/dist/workspace-configuration.js'
 import { getCodebaseMemoryProviderDiagnostics } from './cbm-graph-context'
 import { WorkbenchMaintenanceScheduler } from './workbench-maintenance-scheduler'
+import { reconcileAutomaticRepositories } from './automatic-repository-discovery'
+import { setSourceAvailability } from './source-management'
 import { pruneWorkbenchEvidence } from './workbench-evidence-store'
 import { pruneWorkbenchReadResultRecovery } from './workbench-read-result-recovery'
 import { pruneWorkbenchSessions } from './workbench-session-store'
 import { continuationHintPaths, mergeFollowUpPaths, normalizeFollowUpContext, type WorkbenchContinuationContext } from './workbench-follow-up-context'
 import { routeAdaptiveExecution } from './adaptive-execution-router'
+import { inspectSourceFreshness, type FreshnessRefreshRequest } from './automatic-index-freshness'
 import type { WorkbenchExecutorResult } from '../../../mcp/dist/executor-broker.js'
 
 let cliVersion = process.env.WORKBENCH_PACKAGE_VERSION || 'unknown'
@@ -120,7 +123,7 @@ export async function startLocalServer(port: number = 3052): Promise<void> {
     requestId: requestIdFrom(request, body)
   })
 
-  const maintenanceScheduler = new WorkbenchMaintenanceScheduler({ foregroundDemand: () => activeRequests > 0, maxQueue: 64 })
+  const maintenanceScheduler = new WorkbenchMaintenanceScheduler({ foregroundDemand: () => activeRequests > 0, maxQueue: 64, maxConcurrent: 2 })
   let maintenanceYield: () => Promise<void> = async () => {}
   const indexer = new Indexer(undefined, { yieldIfNeeded: async () => maintenanceYield() })
   const config = loadConfig()
@@ -184,23 +187,38 @@ export async function startLocalServer(port: number = 3052): Promise<void> {
   }, 250)
   const indexingSources = new Set<string>()
   const indexRetryAttempts = new Map<string, number>()
-  let reindexSourceInBackground: (sourceId: string, sourcePath: string, reason?: 'manual' | 'auto' | 'add') => boolean
+  const latestAutomaticRefresh = new Map<string, FreshnessRefreshRequest>()
+  const freshnessDebounceTimers = new Map<string, NodeJS.Timeout>()
+  let reindexSourceInBackground: (sourceId: string, sourcePath: string, reason?: 'manual' | 'auto' | 'add', request?: FreshnessRefreshRequest) => boolean
   let searcher = new VaultSearcher(indexer.getDocs())
   const portableReadHandlers = createPortableReadHandlers({
     indexedFiles: () => indexer.getDocs().length,
     indexingActive: () => indexingSources.size > 0,
     indexingSourceIds: () => Array.from(indexingSources),
+    freshnessSummary: () => {
+      const current = getSourcesSafe()
+      const counts = {
+        total: current.length,
+        ready: current.filter(source => source.freshnessState === 'ready' && source.indexed === true).length,
+        stale: current.filter(source => source.freshnessState === 'stale').length,
+        refreshing: current.filter(source => source.freshnessState === 'refreshing' || source.indexStatus === 'indexing').length,
+        needsAttention: current.filter(source => source.freshnessState === 'needs_attention' || source.indexStatus === 'failed').length,
+        unavailable: current.filter(source => source.freshnessState === 'unavailable' || source.availabilityStatus === 'unavailable').length
+      }
+      return { ...counts, summary: `${counts.ready}/${counts.total} sources ready`, ...(counts.stale > 0 ? { action: 'refreshing stale sources' } : {}) }
+    },
     maintenanceSnapshot: () => maintenanceScheduler.compactSnapshot(),
     requestSourceIndexRecovery: sourceIds => sourceIds.map(sourceId => {
       const source = getSourcesSafe().find(item => item.id === sourceId && item.enabled && isSourcePathAvailable(item.path))
       const state = getSourceIndexState(sourceId)
       if (!source) return { sourceId, status: 'unavailable' as const }
       if (isSourceSearchReady(state)) return { sourceId, status: 'already_ready' as const }
-      const queued = maintenanceScheduler.snapshot().active?.sourceId === sourceId
-        || maintenanceScheduler.snapshot().queued.some(item => item.sourceId === sourceId)
+      const snapshot = maintenanceScheduler.snapshot()
+      const queued = (snapshot.activeJobs || (snapshot.active ? [snapshot.active] : [])).some(item => item.sourceId === sourceId)
+        || snapshot.queued.some(item => item.sourceId === sourceId)
         || indexingSources.has(sourceId)
       if (queued) return { sourceId, status: 'already_queued' as const }
-      return reindexSourceInBackground(sourceId, source.path, 'auto')
+      return queueFreshnessRefresh(sourceId, true)
         ? { sourceId, status: 'queued' as const }
         : { sourceId, status: 'unavailable' as const }
     }),
@@ -313,7 +331,7 @@ export async function startLocalServer(port: number = 3052): Promise<void> {
     for (const source of sources) {
       if (!source.enabled || source.indexStatus !== 'pending' || indexingSources.has(source.id)) continue
       console.log(`[Startup] Queuing pending source for indexing: ${source.id}`)
-      reindexSourceInBackground(source.id, source.path, 'auto')
+      queueFreshnessRefresh(source.id, true)
     }
   }
   setTimeout(queuePendingSourcesAtStartup, 1000)
@@ -417,28 +435,66 @@ export async function startLocalServer(port: number = 3052): Promise<void> {
 
   const hasQueuedReindex = (sourceId: string): boolean => {
     const snapshot = maintenanceScheduler.snapshot()
-    return snapshot.active?.sourceId === sourceId
+    return (snapshot.activeJobs || (snapshot.active ? [snapshot.active] : [])).some(item => item.sourceId === sourceId)
       || snapshot.queued.some(item => item.sourceId === sourceId)
       || indexingSources.has(sourceId)
   }
 
-  reindexSourceInBackground = (sourceId: string, sourcePath: string, reason: 'manual' | 'auto' | 'add' = 'manual'): boolean => {
+  reindexSourceInBackground = (sourceId: string, sourcePath: string, reason: 'manual' | 'auto' | 'add' = 'manual', request?: FreshnessRefreshRequest): boolean => {
+    if (request) latestAutomaticRefresh.set(sourceId, request)
     if (hasQueuedReindex(sourceId)) return false
-    setSourceIndexStatus(sourceId, { indexed: false, indexStatus: 'pending', queuedAt: new Date().toISOString(), indexError: undefined })
+    setSourceIndexStatus(sourceId, {
+      indexed: false,
+      indexStatus: 'pending',
+      freshnessState: request ? 'stale' : 'preparing',
+      refreshReason: request?.reasons.join(',') || reason,
+      changedPathCount: request?.changedPaths.length,
+      observedRevision: request?.observedRevision,
+      observedBranchName: request?.observedBranchName,
+      observedWorktreeIdentity: request?.observedWorktreeIdentity,
+      queuedAt: new Date().toISOString(),
+      indexError: undefined,
+      indexFailureCode: undefined
+    })
     const queued = maintenanceScheduler.enqueue({ sourceId, reason, run: async yieldToForeground => {
       if (!getSourcesSafe().some(source => source.id === sourceId && source.enabled && isSourcePathAvailable(source.path))) return
       maintenanceYield = yieldToForeground
-      setSourceIndexStatus(sourceId, { indexed: false, indexStatus: 'indexing', indexedFileCount: 0, indexProgressCompleted: 0, indexProgressTotal: 0, indexingAt: new Date().toISOString(), indexError: undefined })
+      const plannedRequest = latestAutomaticRefresh.get(sourceId)
+      latestAutomaticRefresh.delete(sourceId)
+      setSourceIndexStatus(sourceId, {
+        indexed: false,
+        indexStatus: 'indexing',
+        freshnessState: 'refreshing',
+        refreshReason: plannedRequest?.reasons.join(',') || reason,
+        changedPathCount: plannedRequest?.changedPaths.length,
+        observedRevision: plannedRequest?.observedRevision,
+        observedBranchName: plannedRequest?.observedBranchName,
+        observedWorktreeIdentity: plannedRequest?.observedWorktreeIdentity,
+        indexedFileCount: 0,
+        indexProgressCompleted: 0,
+        indexProgressTotal: 0,
+        indexingAt: new Date().toISOString(),
+        indexError: undefined,
+        indexFailureCode: undefined
+      })
       indexingSources.add(sourceId)
       try {
-        const indexedFileCount = await indexer.buildIndexForSource(sourceId, sourcePath, ['**/*'], undefined, {
+        const build = plannedRequest?.operation === 'incremental' && plannedRequest.changedPaths.length > 0
+          ? indexer.buildIndexForSourceIncremental.bind(indexer)
+          : indexer.buildIndexForSource.bind(indexer)
+        const buildArgs = plannedRequest?.operation === 'incremental' && plannedRequest.changedPaths.length > 0
+          ? [sourceId, sourcePath, plannedRequest.changedPaths, ['**/*'], undefined]
+          : [sourceId, sourcePath, ['**/*'], undefined]
+        const indexedFileCount = await build(...(buildArgs as any), {
           onProgress: progress => setSourceIndexStatus(sourceId, {
             indexed: false,
             indexStatus: 'indexing',
+            freshnessState: 'refreshing',
             indexedFileCount: progress.indexed,
             indexProgressCompleted: progress.completed,
             indexProgressTotal: progress.total,
-            indexError: undefined
+            indexError: undefined,
+            indexFailureCode: undefined
           })
         })
         refreshSearcherFromDocs()
@@ -451,8 +507,16 @@ export async function startLocalServer(port: number = 3052): Promise<void> {
           indexProgressTotal: indexedFileCount,
           lastIndexedAt: completedAt,
           readyAt: completedAt,
+          indexGeneration: completedAt,
+          freshnessState: 'ready',
+          refreshReason: plannedRequest?.operation || reason,
+          changedPathCount: plannedRequest?.changedPaths.length,
+          retryCount: 0,
+          retryAfterAt: undefined,
+          lastRefreshFailureAt: undefined,
           indexError: undefined
         })
+        try { setSourceAvailability(sourceId, undefined) } catch { /* readiness remains authoritative even if config cleanup is unavailable */ }
         indexRetryAttempts.delete(sourceId)
         if (reason === 'auto') {
           markSourceAutoIndexed(sourceId, completedAt)
@@ -467,13 +531,18 @@ export async function startLocalServer(port: number = 3052): Promise<void> {
         setSourceIndexStatus(sourceId, {
           indexed: false,
           indexStatus: 'failed',
+          freshnessState: 'needs_attention',
           indexFailureCode: failureCode,
+          lastRefreshFailureAt: new Date().toISOString(),
+          retryCount: attempt + 1,
+          retryAfterAt: retryScheduled ? new Date(Date.now() + retryDelayMs).toISOString() : undefined,
           indexError: String(err) + (retryScheduled ? '. Retrying automatically in ' + Math.ceil(retryDelayMs / 1000) + 's.' : '')
         })
         if (retryScheduled) {
           indexRetryAttempts.set(sourceId, attempt + 1)
           setTimeout(() => {
-            if (getSourcesSafe().some(source => source.id === sourceId && source.enabled && isSourcePathAvailable(source.path))) reindexSourceInBackground(sourceId, sourcePath, reason)
+            const source = getSourcesSafe().find(item => item.id === sourceId && item.enabled && isSourcePathAvailable(item.path))
+            if (source) queueFreshnessRefresh(source.id, true)
           }, retryDelayMs)
         } else {
           indexRetryAttempts.delete(sourceId)
@@ -481,39 +550,89 @@ export async function startLocalServer(port: number = 3052): Promise<void> {
       } finally {
         indexingSources.delete(sourceId)
         maintenanceYield = async () => {}
+        const newer = latestAutomaticRefresh.get(sourceId)
+        if (newer) {
+          latestAutomaticRefresh.delete(sourceId)
+          setImmediate(() => reindexSourceInBackground(sourceId, sourcePath, 'auto', newer))
+        }
       }
     } })
     return queued.ok && queued.created
   }
 
-  const shouldAutoIndexSource = (source: ReturnType<typeof getSourcesSafe>[number], now: number): boolean => {
-    if (!source.enabled || source.autoIndexEnabled === false) return false
-    if (source.indexStatus === 'indexing' || indexingSources.has(source.id)) return false
-    if (source.indexStatus === 'failed') return false
-    try {
-      if (!fs.existsSync(source.path) || !fs.statSync(source.path).isDirectory()) return false
-    } catch {
-      return false
+  const queueFreshnessRefresh = (sourceId: string, immediate = false): boolean => {
+    const source = getSourcesSafe({ refreshGitMetadata: false }).find(item => item.id === sourceId)
+    if (!source || !source.enabled || !isSourcePathAvailable(source.path) || indexingSources.has(sourceId)) return false
+    const inspection = inspectSourceFreshness(source)
+    if (inspection.unavailable || inspection.fresh || !inspection.request || !inspection.retryable) return false
+    latestAutomaticRefresh.set(sourceId, inspection.request)
+    setSourceIndexStatus(sourceId, {
+      indexed: false,
+      indexStatus: 'pending',
+      freshnessState: 'stale',
+      refreshReason: inspection.request.reasons.join(','),
+      changedPathCount: inspection.request.changedPaths.length,
+      observedRevision: inspection.request.observedRevision,
+      observedBranchName: inspection.request.observedBranchName,
+      observedWorktreeIdentity: inspection.request.observedWorktreeIdentity,
+      indexError: undefined,
+      indexFailureCode: undefined,
+      queuedAt: new Date().toISOString()
+    })
+    const enqueue = () => {
+      freshnessDebounceTimers.delete(sourceId)
+      const latest = latestAutomaticRefresh.get(sourceId) || inspection.request!
+      reindexSourceInBackground(sourceId, source.path, 'auto', latest)
     }
-    const intervalMs = Math.max(1, source.autoIndexIntervalMinutes || 5) * 60_000
-    const lastRun = source.lastAutoIndexedAt || source.lastIndexedAt
-    if (!lastRun) return true
-    const lastRunMs = Date.parse(lastRun)
-    if (!Number.isFinite(lastRunMs)) return true
-    return now - lastRunMs >= intervalMs
+    const existingTimer = freshnessDebounceTimers.get(sourceId)
+    if (existingTimer) clearTimeout(existingTimer)
+    if (immediate) enqueue()
+    else {
+      const timer = setTimeout(enqueue, 500)
+      freshnessDebounceTimers.set(sourceId, timer)
+    }
+    return true
   }
 
   const runAutoIndexSweep = (): void => {
-    const now = Date.now()
     for (const source of getSourcesSafe()) {
-      if (!shouldAutoIndexSource(source, now)) continue
-      reindexSourceInBackground(source.id, source.path, 'auto')
+      // Freshness is state driven. This timer is only a bounded observation
+      // cadence, never the definition of staleness.
+      queueFreshnessRefresh(source.id)
     }
   }
 
   const autoIndexTimer = setInterval(runAutoIndexSweep, 30_000)
   autoIndexTimer.unref?.()
   fastify.addHook('onClose', async () => clearInterval(autoIndexTimer))
+
+  const configuredDiscoverySettings = getSourceDiscoverySettings()
+  let automaticDiscoveryRunning = false
+  const runAutomaticDiscovery = (): void => {
+    if (automaticDiscoveryRunning) return
+    const discoverySettings = getSourceDiscoverySettings()
+    if (!discoverySettings.rootPath && !(discoverySettings.rootPaths && discoverySettings.rootPaths.length > 0)) return
+    automaticDiscoveryRunning = true
+    try {
+      const result = reconcileAutomaticRepositories({
+        enqueueIndex: (sourceId, sourcePath, reason) => reindexSourceInBackground(sourceId, sourcePath, reason),
+        maxRegistrations: 32
+      })
+      if (result.sourcesRegistered > 0 || result.worktreesDiscovered > 0 || result.sourcesUnavailable > 0 || result.sourcesStale > 0 || result.indexJobsQueued > 0) {
+        console.log(`[Discovery] repos=${result.repositoriesDiscovered} worktrees=${result.worktreesDiscovered} registered=${result.sourcesRegistered} refreshed=${result.metadataRefreshed} unavailable=${result.sourcesUnavailable} stale=${result.sourcesStale} indexesQueued=${result.indexJobsQueued}`)
+      }
+      for (const error of result.errors) console.error(`[Discovery] ${error}`)
+    } catch (error) {
+      console.error(`[Discovery] Automatic reconciliation failed safely: ${error instanceof Error ? error.message : String(error)}`)
+    } finally {
+      automaticDiscoveryRunning = false
+    }
+  }
+  const automaticDiscoveryIntervalMs = Math.max(10, configuredDiscoverySettings.intervalMinutes || 30) * 60_000
+  const automaticDiscoveryTimer = setInterval(runAutomaticDiscovery, automaticDiscoveryIntervalMs)
+  automaticDiscoveryTimer.unref?.()
+  fastify.addHook('onClose', async () => clearInterval(automaticDiscoveryTimer))
+  setTimeout(runAutomaticDiscovery, 1_500)
 
   const rejectUnindexedSources = (sourceIds: string[], reply: any) => {
     const blocked = sourceIds
@@ -526,6 +645,9 @@ export async function startLocalServer(port: number = 3052): Promise<void> {
 
     if (blocked.length > 0) {
       const messages = blocked.map(item => {
+        if (item.state?.freshnessState === 'stale') {
+          return `${item.sourceId} changed since its last index and is being refreshed automatically.`
+        }
         if (item.state?.indexStatus === 'pending') {
           return `${item.sourceId} has not been indexed yet. Reindex it from the dashboard first.`
         }
@@ -546,8 +668,14 @@ export async function startLocalServer(port: number = 3052): Promise<void> {
           indexStatus: item.state?.indexStatus || 'unknown',
           indexError: item.state?.indexError,
           indexFailureCode: item.state?.indexFailureCode,
+          freshnessState: item.state?.freshnessState,
+          indexedRevision: item.state?.sourceRevision,
+          observedRevision: item.state?.observedRevision,
+          refreshReason: item.state?.refreshReason,
           indexedFileCount: item.state?.indexedFileCount,
-          recoveryAction: item.state?.indexStatus === 'pending'
+          recoveryAction: item.state?.freshnessState === 'stale'
+            ? 'Wait for automatic refresh'
+            : item.state?.indexStatus === 'pending'
             ? 'Reindex from dashboard'
             : item.state?.indexStatus === 'failed'
               ? 'Reindex from dashboard or choose a ready source'
@@ -594,11 +722,15 @@ export async function startLocalServer(port: number = 3052): Promise<void> {
       indexingSources: sources.filter(source => source.indexStatus === 'indexing').length,
       failedSources: sources.filter(source => source.indexStatus === 'failed').length,
       disabledSources: sources.filter(source => source.indexStatus === 'disabled').length,
+      staleSources: sources.filter(source => source.freshnessState === 'stale').length,
+      refreshingSources: sources.filter(source => source.freshnessState === 'refreshing' || source.indexStatus === 'indexing').length,
+      needsAttentionSources: sources.filter(source => source.freshnessState === 'needs_attention' || source.indexStatus === 'failed').length,
       sourceIdsByStatus: {
         ready: sources.filter(source => source.indexStatus === 'ready').map(source => source.id),
         pending: sources.filter(source => source.indexStatus === 'pending').map(source => source.id),
         indexing: sources.filter(source => source.indexStatus === 'indexing').map(source => source.id),
-        failed: sources.filter(source => source.indexStatus === 'failed').map(source => source.id)
+        failed: sources.filter(source => source.indexStatus === 'failed').map(source => source.id),
+        stale: sources.filter(source => source.freshnessState === 'stale').map(source => source.id)
       }
     }
     const queue = collectIndexQueueDiagnostics({ sources })
@@ -2192,6 +2324,8 @@ export async function startLocalServer(port: number = 3052): Promise<void> {
         indexedFileCount: source.indexedFileCount,
         indexProgressCompleted: source.indexProgressCompleted,
         indexProgressTotal: source.indexProgressTotal,
+        availabilityStatus: source.availabilityStatus || 'discovered',
+        availabilityReason: source.availabilityReason,
         ...(lite ? {} : {
           lastIndexedAt: source.lastIndexedAt,
           indexError: source.indexError,

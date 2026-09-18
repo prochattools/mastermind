@@ -6,39 +6,70 @@
   :root {
     --font-ui: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "SF Pro Text", "Inter", "Segoe UI", sans-serif;
     --font-mono: "JetBrainsMono Nerd Font", "JetBrains Mono", "SFMono-Regular", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-    --bf-bg: 248 250 252;
-    --bf-surface: 255 255 255;
-    --bf-surface-subtle: 248 250 252;
-    --bf-border: 226 232 240;
-    --bf-text: 15 23 42;
-    --bf-muted: 100 116 139;
-    --bf-accent: 15 23 42;
-    --bf-success: 16 185 129;
-    --bf-warning: 245 158 11;
-    --bf-danger: 239 68 68;
+    --canvas: 248 250 252;
+    --surface: 255 255 255;
+    --surface-subtle: 248 250 252;
+    --surface-raised: 255 255 255;
+    --border: 226 232 240;
+    --border-strong: 203 213 225;
+    --text: 15 23 42;
+    --text-muted: 100 116 139;
+    --text-subtle: 148 163 184;
+    --accent: 15 23 42;
+    --focus-ring: 59 130 246;
+    --success: 16 185 129;
+    --warning: 245 158 11;
+    --danger: 239 68 68;
+
+    /* Temporary aliases for screens that have not moved to the neutral layer. */
+    --bf-bg: var(--canvas);
+    --bf-surface: var(--surface);
+    --bf-surface-subtle: var(--surface-subtle);
+    --bf-border: var(--border);
+    --bf-text: var(--text);
+    --bf-muted: var(--text-muted);
+    --bf-accent: var(--accent);
+    --bf-success: var(--success);
+    --bf-warning: var(--warning);
+    --bf-danger: var(--danger);
   }
 
   .dark {
-    --bf-bg: 2 6 23;
-    --bf-surface: 15 23 42;
-    --bf-surface-subtle: 15 23 42;
-    --bf-border: 30 41 59;
-    --bf-text: 226 232 240;
-    --bf-muted: 148 163 184;
-    --bf-accent: 226 232 240;
-    --bf-success: 16 185 129;
-    --bf-warning: 245 158 11;
-    --bf-danger: 248 113 113;
+    --canvas: 2 6 23;
+    --surface: 15 23 42;
+    --surface-subtle: 15 23 42;
+    --surface-raised: 30 41 59;
+    --border: 30 41 59;
+    --border-strong: 51 65 85;
+    --text: 226 232 240;
+    --text-muted: 148 163 184;
+    --text-subtle: 100 116 139;
+    --accent: 226 232 240;
+    --focus-ring: 96 165 250;
+    --success: 16 185 129;
+    --warning: 245 158 11;
+    --danger: 248 113 113;
+
+    --bf-bg: var(--canvas);
+    --bf-surface: var(--surface);
+    --bf-surface-subtle: var(--surface-subtle);
+    --bf-border: var(--border);
+    --bf-text: var(--text);
+    --bf-muted: var(--text-muted);
+    --bf-accent: var(--accent);
+    --bf-success: var(--success);
+    --bf-warning: var(--warning);
+    --bf-danger: var(--danger);
   }
 
   html {
-    background: rgb(var(--bf-bg));
+    background: rgb(var(--canvas));
   }
 
   body {
     font-family: var(--font-ui);
-    color: rgb(var(--bf-text));
-    background: rgb(var(--bf-bg));
+    color: rgb(var(--text));
+    background: rgb(var(--canvas));
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }

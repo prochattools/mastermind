@@ -11,6 +11,7 @@ import {
   INDEX_SCAN_EXCLUSION_VERSION,
   INDEX_SCAN_POLICY_ID,
   INDEX_SCAN_POLICY_VERSION,
+  INDEX_SCHEMA_VERSION,
   MAX_INDEX_SCAN_BYTES,
   MAX_INDEX_SCAN_DIRECTORIES,
   MAX_INDEX_SCAN_ENTRIES_PER_DIRECTORY,
@@ -32,7 +33,7 @@ const YIELD_EVERY_FILES = 25
 const BUFFER_SAMPLE_BYTES = 4096
 const ALLOWED_HIDDEN_INDEX_PREFIXES = ['.kiro/']
 const ALLOWED_HIDDEN_INDEX_FILES = new Set(['.ai/current.md'])
-export { DEFAULT_IGNORE_PATTERNS, INDEX_SCAN_EXCLUSION_VERSION, INDEX_SCAN_POLICY_ID, INDEX_SCAN_POLICY_VERSION, MAX_INDEX_SCAN_BYTES, MAX_INDEX_SCAN_DIRECTORIES, MAX_INDEX_SCAN_ENTRIES_PER_DIRECTORY, MAX_INDEX_SCAN_FILES, MAX_INDEX_SCAN_WALL_TIME_MS, MAX_INDEXABLE_FILE_BYTES, MAX_INDEX_SCAN_DEPTH, MAX_INDEX_SCAN_HARD_DEPTH, NON_TEXTUAL_INDEX_EXTENSIONS, isDeterministicallyNonTextualPath } from './index-scan-policy'
+export { DEFAULT_IGNORE_PATTERNS, INDEX_SCAN_EXCLUSION_VERSION, INDEX_SCAN_POLICY_ID, INDEX_SCAN_POLICY_VERSION, INDEX_SCHEMA_VERSION, MAX_INDEX_SCAN_BYTES, MAX_INDEX_SCAN_DIRECTORIES, MAX_INDEX_SCAN_ENTRIES_PER_DIRECTORY, MAX_INDEX_SCAN_FILES, MAX_INDEX_SCAN_WALL_TIME_MS, MAX_INDEXABLE_FILE_BYTES, MAX_INDEX_SCAN_DEPTH, MAX_INDEX_SCAN_HARD_DEPTH, NON_TEXTUAL_INDEX_EXTENSIONS, isDeterministicallyNonTextualPath } from './index-scan-policy'
 export const MAX_INDEX_SCAN_RESULTS = POLICY_MAX_INDEX_SCAN_RESULTS
 
 export type IndexerOptions = {
@@ -329,6 +330,35 @@ function readJsonArray<T>(filePath: string): T[] {
   }
 }
 
+async function readIndexableDocument(sourceId: string, rootPath: string, filePath: string): Promise<IndexedDoc | undefined> {
+  if (!shouldIndexRelativePath(filePath) || isDeterministicallyNonTextualPath(filePath)) return undefined
+  const fullPath = path.join(rootPath, filePath)
+  const stat = await fsp.stat(fullPath)
+  if (!stat.isFile() || stat.size > MAX_INDEXABLE_BYTES) return undefined
+  const contentBuffer = await fsp.readFile(fullPath)
+  if (isProbablyBinaryContent(contentBuffer)) return undefined
+  const content = contentBuffer.toString('utf8')
+  let title = path.basename(filePath, path.extname(filePath))
+  let tags: string[] = []
+  if (filePath.endsWith('.md')) {
+    const { data } = matter(content)
+    title = data.title || title
+    tags = data.tags || []
+  }
+  return {
+    sourceId,
+    id: `${sourceId}:${filePath}`,
+    path: filePath,
+    title,
+    extension: path.extname(filePath),
+    modifiedAt: stat.mtime.toISOString(),
+    size: stat.size,
+    tags,
+    contentPreview: content.slice(0, 200),
+    content
+  }
+}
+
 export class Indexer {
   private docs: IndexedDoc[] = []
 
@@ -396,48 +426,10 @@ export class Indexer {
 
       for (const filePath of scan.files) {
         try {
-          if (!shouldIndexRelativePath(filePath) || isDeterministicallyNonTextualPath(filePath)) {
+          const doc = await readIndexableDocument(sourceId, rootPath, filePath)
+          if (!doc) {
             skippedFiles++
             continue
-          }
-          const fullPath = path.join(rootPath, filePath)
-          const stat = await fsp.stat(fullPath)
-          if (!stat.isFile()) {
-            skippedFiles++
-            continue
-          }
-          if (stat.size > MAX_INDEXABLE_BYTES) {
-            skippedFiles++
-            continue
-          }
-
-          const contentBuffer = await fsp.readFile(fullPath)
-          if (isProbablyBinaryContent(contentBuffer)) {
-            skippedFiles++
-            continue
-          }
-          const content = contentBuffer.toString('utf8')
-
-          let title = path.basename(filePath, path.extname(filePath))
-          let tags: string[] = []
-
-          if (filePath.endsWith('.md')) {
-            const { data } = matter(content)
-            title = data.title || title
-            tags = data.tags || []
-          }
-
-          const doc: IndexedDoc = {
-            sourceId,
-            id: `${sourceId}:${filePath}`,
-            path: filePath,
-            title,
-            extension: path.extname(filePath),
-            modifiedAt: stat.mtime.toISOString(),
-            size: stat.size,
-            tags,
-            contentPreview: content.slice(0, 200),
-            content
           }
 
           nextDocs.push(doc)
@@ -497,6 +489,93 @@ export class Indexer {
     return indexedFiles
   }
 
+  /**
+   * Rebuild only changed/new files while still scanning the bounded source
+   * tree for removals. The caller must provide a proven changed-path set;
+   * otherwise the safe full builder remains the only valid operation.
+   */
+  async buildIndexForSourceIncremental(sourceId: string, sourcePath: string, changedPaths: string[], patterns: string[] = ['**/*'], ignorePatterns: string[] = DEFAULT_IGNORE_PATTERNS, progressOptions: IndexerOptions = {}): Promise<number> {
+    const onProgress = progressOptions.onProgress ?? this.options.onProgress
+    const startedAt = Date.now()
+    const scan = await boundedSourceScan(sourcePath, patterns, ignorePatterns)
+    if (scan.terminationReason !== 'completed') throw new IndexScanError(scan)
+
+    const previousDocs = new Map(this.docs.filter(doc => doc.sourceId === sourceId).map(doc => [doc.path, doc]))
+    const forced = new Set(changedPaths.map(item => item.replace(/\\/g, '/')))
+    const nextDocs = this.docs.filter(doc => doc.sourceId !== sourceId)
+    const sourceDocs: IndexedDoc[] = []
+    let indexedFiles = 0
+    let processedFiles = 0
+    await onProgress?.({ completed: 0, total: scan.files.length, indexed: 0 })
+
+    try {
+      for (const filePath of scan.files) {
+        try {
+          const prior = previousDocs.get(filePath)
+          let doc = prior
+          if (!prior || forced.has(filePath)) {
+            doc = await readIndexableDocument(sourceId, sourcePath, filePath)
+          } else {
+            const stat = await fsp.stat(path.join(sourcePath, filePath))
+            if (stat.size !== prior.size || stat.mtime.toISOString() !== prior.modifiedAt) {
+              doc = await readIndexableDocument(sourceId, sourcePath, filePath)
+            }
+          }
+          if (!doc) continue
+          nextDocs.push(doc)
+          sourceDocs.push(doc)
+          indexedFiles++
+        } catch (err) {
+          console.warn(`Failed to incrementally index ${filePath} from ${sourceId}:`, err)
+        } finally {
+          processedFiles++
+          if (processedFiles === scan.files.length || processedFiles % YIELD_EVERY_FILES === 0) {
+            await onProgress?.({ completed: processedFiles, total: scan.files.length, indexed: indexedFiles })
+          }
+        }
+        if (processedFiles % YIELD_EVERY_FILES === 0) {
+          await yieldToEventLoop()
+          await this.options.yieldIfNeeded?.()
+        }
+      }
+    } catch (err) {
+      recordIndexTelemetry({
+        sourceId,
+        durationMs: Date.now() - startedAt,
+        indexedFileCount: scan.filesConsidered,
+        directoriesVisited: scan.directoriesVisited,
+        filesConsidered: scan.filesConsidered,
+        bytesConsidered: scan.bytesConsidered,
+        entriesExamined: scan.entriesExamined,
+        maxDepth: scan.maxDepth,
+        resultsEmitted: scan.files.length,
+        terminationReason: scan.terminationReason,
+        outcome: 'failure',
+        reasonCode: 'incremental_index_failed'
+      })
+      throw err
+    }
+
+    this.docs = nextDocs
+    this.saveSourceToDisk(sourceId, sourceDocs)
+    this.saveManifestToDisk()
+    recordIndexTelemetry({
+      sourceId,
+      durationMs: Date.now() - startedAt,
+      indexedFileCount: indexedFiles,
+      directoriesVisited: scan.directoriesVisited,
+      filesConsidered: scan.filesConsidered,
+      bytesConsidered: scan.bytesConsidered,
+      entriesExamined: scan.entriesExamined,
+      maxDepth: scan.maxDepth,
+      resultsEmitted: scan.files.length,
+      terminationReason: scan.terminationReason,
+      outcome: 'success',
+      reasonCode: 'incremental_index_completed'
+    })
+    return indexedFiles
+  }
+
   removeSourceDocs(sourceId: string): number {
     const before = this.docs.length
     this.docs = this.docs.filter(doc => doc.sourceId !== sourceId)
@@ -537,6 +616,7 @@ export class Indexer {
       const manifest = {
         version: 3,
         storage: 'per-source-json',
+        schemaVersion: INDEX_SCHEMA_VERSION,
         policyVersion: INDEX_SCAN_POLICY_VERSION,
         exclusionVersion: INDEX_SCAN_EXCLUSION_VERSION,
         policyIdentity: INDEX_SCAN_POLICY_ID,

@@ -34,7 +34,7 @@ async function main() {
     connected: true,
     sourceCount: 2,
     sourcesAvailable: true,
-    version: '1.2.13-beta'
+    version: '2.0.0-beta'
   }), {
     status: 200,
     headers: { 'content-type': 'application/json' }

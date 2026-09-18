@@ -27,7 +27,7 @@ type IndexTelemetryInput = {
   resultsEmitted?: number
   terminationReason?: 'completed' | 'depth_limit' | 'entries_limit' | 'result_limit' | 'directory_budget' | 'file_budget' | 'byte_budget' | 'time_budget' | 'source_missing' | 'symlink_rejected' | 'io_error' | 'scan_failed'
   outcome: 'success' | 'failure'
-  reasonCode: 'index_completed' | 'index_failed' | 'source_not_found' | 'source_path_missing'
+  reasonCode: 'index_completed' | 'index_failed' | 'incremental_index_completed' | 'incremental_index_failed' | 'source_not_found' | 'source_path_missing'
 }
 
 type GraphifyTelemetryInput = {

@@ -1,8 +1,14 @@
-# Contributing to ProChat Workbench Local
+# Contributing to Mastermind Local
 
-ProChat Workbench Local is the public GitHub priority. Keep contributions focused on the free, self-hosted, local-first product defined in `docs/product/public-scope.md`.
+Mastermind Local is the public GitHub project. Keep contributions focused on
+the free, self-hosted, local-first product defined in `docs/product/public-scope.md`.
 
-The public snapshot is licensed under `AGPL-3.0-only` as the ProChat Workbench Local product-specific exception recorded in Mind. Separate commercial or OEM licensing may be requested, but public documentation does not grant commercial or OEM rights. Accepted external code must be contributed under terms that preserve ProChat's ability to distribute it under the public AGPL snapshot and any separate written commercial/OEM agreements.
+The public snapshot is licensed under `AGPL-3.0-only` as the Mastermind Local
+product-specific exception recorded in Mind. Separate commercial or OEM
+licensing may be requested, but public documentation does not grant commercial
+or OEM rights. Accepted external code must be contributed under terms that
+preserve ProChat's ability to distribute it under the public AGPL snapshot and
+any separate written commercial/OEM agreements.
 
 ## Good contribution areas
 
@@ -16,8 +22,8 @@ The public snapshot is licensed under `AGPL-3.0-only` as the ProChat Workbench L
 ## How to help
 
 - File setup friction with the provided GitHub issue templates.
-- Keep feedback focused on BuildFlow Local public beta readiness.
-- Propose small docs or UX improvements that help a new GitHub user clone, run, understand, and share BuildFlow.
+- Keep feedback focused on Mastermind Local public beta readiness.
+- Propose small docs or UX improvements that help a new GitHub user clone, run, understand, and share Mastermind.
 
 ## Secrets and logs
 
@@ -31,7 +37,7 @@ Issues, discussions, bug reports, and design feedback do not require a contribut
 Before ProChat merges an external code or documentation contribution, the contributor must accept contributor terms approved by ProChat that grant the rights needed to:
 
 - include the contribution in the AGPL-licensed public snapshot;
-- reproduce, modify, distribute, sublicense, and relicense the contribution as part of ProChat Workbench;
+- reproduce, modify, distribute, sublicense, and relicense the contribution as part of Mastermind;
 - offer the contribution under separate commercial or OEM licenses;
 - exercise an appropriate patent license for patent claims necessarily infringed by the contribution.
 
@@ -39,7 +45,7 @@ Until a reviewed contributor-agreement workflow is enabled, external pull reques
 
 ## Before opening a pull request
 
-- Describe the Workbench Local problem or improvement clearly.
+- Describe the Mastermind Local problem or improvement clearly.
 - Confirm that the change contains no private roadmap, customer, credential, or infrastructure material.
 - Mention the validation you ran.
 - Keep the change small and focused when possible.

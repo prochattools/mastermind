@@ -54,7 +54,7 @@ type ActivityPhase =
 type ActivityRiskLevel = 'low' | 'medium' | 'high'
 
 type ActionActivity = {
-  version: '1.2.13-beta'
+  version: '2.0.0-beta'
   operationId: string
   phase: ActivityPhase
   actionLabel: string
@@ -202,7 +202,7 @@ function summarizeActivityOutput(input: ActivityInput): string {
 // Keep this intentionally small: action payload size directly affects GPT latency.
 export function makeActivity(input: ActivityInput): ActionActivity {
   return {
-    version: '1.2.13-beta',
+    version: '2.0.0-beta',
     operationId: input.operationId,
     phase: input.phase,
     actionLabel: input.actionLabel,

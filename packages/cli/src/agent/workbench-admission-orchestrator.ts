@@ -20,6 +20,7 @@ import {
   type WorkbenchSessionStoreFailure,
   type WorkbenchSessionStoreOptions
 } from './workbench-session-store'
+import { getSourcesSafe, resolveConfiguredSourceId } from './config'
 import {
   recordWorkbenchSessionAdmissionFailure,
   type WorkbenchSessionAdmissionPredicate
@@ -150,7 +151,12 @@ export function acquireWorkbenchAdmission(input: {
       ...(isSessionFailure(session) ? { cause: session } : {})
     }
   }
-  if (!session.lockedSourceIds.includes(input.sourceId)) {
+  const configuredSources = getSourcesSafe({ refreshGitMetadata: false, includeIndexState: false })
+  const ownsSource = session.lockedSourceIds.some(lockedSourceId => {
+    if (lockedSourceId === input.sourceId) return true
+    try { return resolveConfiguredSourceId(lockedSourceId, configuredSources) === input.sourceId } catch { return false }
+  })
+  if (!ownsSource) {
     recordAdmissionFailure({ ...input, code: 'ADMISSION_SOURCE_NOT_OWNED', predicate: 'source_mismatch' }, options)
     return { ok: false, code: 'ADMISSION_SOURCE_NOT_OWNED', message: 'The session does not own the selected source.' }
   }

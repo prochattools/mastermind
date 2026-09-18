@@ -100,7 +100,7 @@ export async function POST(request: NextRequest) {
       stdout: (commit as { stdout?: string }).stdout,
       stderr: committed ? undefined : (commit as { stderr?: string }).stderr,
       activity: {
-        version: '1.2.13-beta',
+        version: '2.0.0-beta',
         operationId: 'commitBuildFlowChanges',
         phase: committed ? 'completed' : 'failed',
         actionLabel: 'Committed explicit repo paths',

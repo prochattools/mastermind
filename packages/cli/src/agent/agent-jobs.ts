@@ -28,11 +28,20 @@ import { normalizeCompiledRunPlan, type CompiledRunPlan } from './roadmap-to-run
 import { buildResumeProjection, isResumeProjectionFresh, type ResumeProjection } from './resume-projection'
 import { buildHandoffProjection, classifyHandoffTransition, type HandoffProjection } from './handoff-projection'
 import { normalizeFollowUpContext, type WorkbenchContinuationContext } from './workbench-follow-up-context'
+import { getWorkbenchPacketRecord } from './workbench-packet-store'
 
 export const WORKBENCH_RUN_SCHEMA_VERSION = 1 as const
 const COMPLETED_RUN_PROJECTION_RETENTION_MS = 10 * 60 * 1000
+const WORKBENCH_ACTION_RUN_STALE_AFTER_MS = 2 * 60 * 1000
+const MAX_HISTORICAL_RUN_RECONCILIATIONS_PER_PROJECTION = 5
+// Bounded Action runs are disposable lifecycle projections. Their durable
+// read result and evidence have separate bounded stores, while owner-created
+// runs remain retained for explicit continuation and audit history.
+const MAX_PERSISTED_BOUNDED_TERMINAL_RUNS = 256
 
 export type AgentJobStatus = 'queued' | 'running' | 'paused' | 'cancelled' | 'needs_confirmation' | 'blocked' | 'completed' | 'failed'
+export type BlockedRunDisposition = 'resumable' | 'historical'
+export type PausedRunDisposition = 'resumable' | 'historical'
 export type AgentJobMode = 'repo_agent'
 export type AgentAutonomyLevel = 'supervised' | 'hands_off_safe'
 
@@ -130,6 +139,9 @@ export type AgentJob = {
   requiresConfirmation: boolean
   confirmationReason?: string
   blockedReason?: string
+  /** Explicitly distinguishes a blocked workflow that can continue from historical evidence. */
+  blockedDisposition?: BlockedRunDisposition
+  pausedDisposition?: PausedRunDisposition
   steps: AgentJobStep[]
   roadmapPhases: AgentJobPhase[]
   activeTaskId?: string
@@ -201,6 +213,8 @@ export type CompactAgentJob = Pick<
   | 'requiresConfirmation'
   | 'confirmationReason'
   | 'blockedReason'
+  | 'blockedDisposition'
+  | 'pausedDisposition'
   | 'lastKnownGitStatus'
 > & {
   totalTaskCount: number
@@ -238,6 +252,8 @@ let loadedJobsFileSignature: string | undefined
 const MAX_GOAL_LENGTH = 3000
 const MAX_ITERATIONS = 40
 const JOB_STORE_PATH = path.join(getConfigDir(), 'agent-jobs.json')
+const BOUNDED_JOB_STORE_PATH = path.join(getConfigDir(), 'bounded-action-runs.json')
+let legacyBoundedJobsInMainStore = false
 // Compact job payloads are returned to GPT Actions repeatedly; keep summaries short.
 const COMPACT_TEXT_LIMIT = 420
 const COMPACT_LIST_ITEM_LIMIT = 160
@@ -492,7 +508,9 @@ function coerceJob(raw: unknown): AgentJob | null {
     autoPush: item.autoPush === true,
     requiresConfirmation: item.status === 'needs_confirmation' || item.requiresConfirmation === true,
     confirmationReason: item.status === 'needs_confirmation' || item.requiresConfirmation === true ? item.confirmationReason : undefined,
-    blockedReason: item.blockedReason,
+    blockedReason: typeof item.blockedReason === 'string' ? item.blockedReason : undefined,
+    blockedDisposition: item.blockedDisposition === 'resumable' || item.blockedDisposition === 'historical' ? item.blockedDisposition : undefined,
+    pausedDisposition: item.pausedDisposition === 'resumable' || item.pausedDisposition === 'historical' ? item.pausedDisposition : undefined,
     steps: Array.isArray(item.steps) && item.steps.length > 0 ? item.steps : buildSteps(),
     roadmapPhases,
     activeTaskId,
@@ -518,48 +536,94 @@ function coerceJob(raw: unknown): AgentJob | null {
   }
 }
 
-function jobsFileSignature(): string | undefined {
+function fileSignature(filePath: string): string | undefined {
   try {
-    const stat = fs.statSync(JOB_STORE_PATH)
+    const stat = fs.statSync(filePath)
     return `${stat.mtimeMs}:${stat.size}`
   } catch {
     return undefined
   }
 }
 
-function loadJobsFromDisk(): void {
-  const signature = jobsFileSignature()
-  if (signature === loadedJobsFileSignature) return
+function jobsFileSignature(): string {
+  return `${fileSignature(JOB_STORE_PATH) || 'missing'}|${fileSignature(BOUNDED_JOB_STORE_PATH) || 'missing'}`
+}
+
+function readPersistedJobs(filePath: string): unknown[] {
   try {
-    if (!signature) {
-      jobs.clear()
-      loadedJobsFileSignature = undefined
-      return
-    }
-    const parsed = JSON.parse(fs.readFileSync(JOB_STORE_PATH, 'utf8')) as { jobs?: unknown[] }
-    jobs.clear()
-    for (const raw of parsed.jobs || []) {
-      const job = coerceJob(raw)
-      if (job) jobs.set(job.id, job)
-    }
-    loadedJobsFileSignature = signature
+    const parsed = JSON.parse(fs.readFileSync(filePath, 'utf8')) as { jobs?: unknown[] }
+    return Array.isArray(parsed.jobs) ? parsed.jobs : []
   } catch {
-    // Ignore corrupted job state; repo-local handoff docs remain the recovery source of truth.
+    return []
   }
 }
 
-function persistJobs(): void {
+function loadJobsFromDisk(): void {
+  const signature = jobsFileSignature()
+  if (signature === loadedJobsFileSignature) return
+  jobs.clear()
+  const mainJobs = readPersistedJobs(JOB_STORE_PATH)
+  const boundedJobs = readPersistedJobs(BOUNDED_JOB_STORE_PATH)
+  legacyBoundedJobsInMainStore = mainJobs.some(raw => {
+    const job = coerceJob(raw)
+    return job ? isBoundedWorkbenchActionRun(job) : false
+  })
+  for (const raw of [...mainJobs, ...boundedJobs]) {
+    const job = coerceJob(raw)
+    if (job) jobs.set(job.id, job)
+  }
+  loadedJobsFileSignature = signature
+}
+
+function writePersistedJobs(filePath: string, records: AgentJob[]): void {
   ensureJobStoreDir()
   const payload = {
     version: 2,
     runSchemaVersion: WORKBENCH_RUN_SCHEMA_VERSION,
     updatedAt: new Date().toISOString(),
-    jobs: Array.from(jobs.values()).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
+    jobs: records.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
   }
-  const temporaryPath = `${JOB_STORE_PATH}.tmp`
+  const temporaryPath = `${filePath}.tmp`
   fs.writeFileSync(temporaryPath, JSON.stringify(payload), 'utf8')
-  fs.renameSync(temporaryPath, JOB_STORE_PATH)
+  fs.renameSync(temporaryPath, filePath)
+}
+
+function persistJobs(): void {
+  // Preserve bounded jobs during the one-time migration from the historical
+  // mixed store, or if the bounded store was removed/corrupted externally.
+  if (legacyBoundedJobsInMainStore || fileSignature(BOUNDED_JOB_STORE_PATH) === undefined) {
+    prunePersistedBoundedTerminalRuns()
+    writePersistedJobs(BOUNDED_JOB_STORE_PATH, Array.from(jobs.values()).filter(job => isBoundedWorkbenchActionRun(job)))
+  }
+  writePersistedJobs(JOB_STORE_PATH, Array.from(jobs.values()).filter(job => !isBoundedWorkbenchActionRun(job)))
+  legacyBoundedJobsInMainStore = false
   loadedJobsFileSignature = jobsFileSignature()
+}
+
+function persistBoundedJobs(): void {
+  prunePersistedBoundedTerminalRuns()
+  writePersistedJobs(BOUNDED_JOB_STORE_PATH, Array.from(jobs.values()).filter(job => isBoundedWorkbenchActionRun(job)))
+  // Migrate the historical mixed store once. Subsequent read-only Action
+  // transitions touch only bounded-action-runs.json and never serialize the
+  // larger owner-created run history.
+  if (legacyBoundedJobsInMainStore) {
+    writePersistedJobs(JOB_STORE_PATH, Array.from(jobs.values()).filter(job => !isBoundedWorkbenchActionRun(job)))
+    legacyBoundedJobsInMainStore = false
+  }
+  loadedJobsFileSignature = jobsFileSignature()
+}
+
+function prunePersistedBoundedTerminalRuns(nowMs = Date.now()): void {
+  const terminal = Array.from(jobs.values())
+    .filter(job => isBoundedWorkbenchActionRun(job) && ['completed', 'failed', 'cancelled'].includes(job.status))
+    .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt) || right.id.localeCompare(left.id))
+  const retained = new Set(terminal
+    .filter(job => nowMs - Date.parse(job.updatedAt) <= COMPLETED_RUN_PROJECTION_RETENTION_MS)
+    .slice(0, MAX_PERSISTED_BOUNDED_TERMINAL_RUNS)
+    .map(job => job.id))
+  for (const job of terminal) {
+    if (!retained.has(job.id)) jobs.delete(job.id)
+  }
 }
 
 function requireWorkbenchRunSession(job: AgentJob, session?: WorkbenchSessionStoreOptions): void {
@@ -571,15 +635,18 @@ function requireWorkbenchRunSession(job: AgentJob, session?: WorkbenchSessionSto
 
 function persistJobTransition(previous: AgentJob | undefined, next: AgentJob, session?: WorkbenchSessionStoreOptions): void {
   jobs.set(next.id, next)
+  const persist = isBoundedWorkbenchActionRun(next) || (previous ? isBoundedWorkbenchActionRun(previous) : false)
+    ? persistBoundedJobs
+    : persistJobs
   try {
-    persistJobs()
+    persist()
     requireWorkbenchRunSession(next, session)
     return
   } catch (error) {
     if (previous) jobs.set(previous.id, previous)
     else jobs.delete(next.id)
     try {
-      persistJobs()
+      persist()
     } catch {
       // Keep the original transition failure; the in-memory snapshot is already restored.
     }
@@ -709,6 +776,8 @@ export type AgentJobUpdate = Partial<Pick<AgentJob,
   | 'status'
   | 'currentIteration'
   | 'blockedReason'
+  | 'blockedDisposition'
+  | 'pausedDisposition'
   | 'requiresConfirmation'
   | 'confirmationReason'
   | 'nextActions'
@@ -736,8 +805,9 @@ export function updateAgentJob(jobId: string, patch: AgentJobUpdate): AgentJob {
   const roadmapPhases = normalizeRoadmapPhases(patch.roadmapPhases || job.roadmapPhases, job.goal)
   let status = patch.status || job.status
   const continuationCleared = clearsContinuationState(status)
+  const activeTaskCleared = Object.prototype.hasOwnProperty.call(patch, 'activeTaskId') && patch.activeTaskId === undefined
   const requestedActiveTaskId = Object.prototype.hasOwnProperty.call(patch, 'activeTaskId') ? patch.activeTaskId : job.activeTaskId
-  const activeTaskId = continuationCleared ? undefined : findActiveTaskId(roadmapPhases, requestedActiveTaskId)
+  const activeTaskId = continuationCleared || activeTaskCleared ? undefined : findActiveTaskId(roadmapPhases, requestedActiveTaskId)
   const completedTaskCount = countCompletedTasks(roadmapPhases)
   const resumeInstructions = continuationCleared
     ? []
@@ -757,6 +827,7 @@ export function updateAgentJob(jobId: string, patch: AgentJobUpdate): AgentJob {
             ? job.resumeState.instructions
             : resumeInstructions
       }
+  if (activeTaskCleared) resumeState.nextTaskId = undefined
   const metrics: WorkbenchRunMetrics = {
     completedPackets: Math.max(job.metrics.completedPackets, completedPacketIds.length, Number(patch.metrics?.completedPackets ?? 0)),
     failedPackets: Math.max(job.metrics.failedPackets, Number(patch.metrics?.failedPackets ?? 0)),
@@ -788,6 +859,16 @@ export function updateAgentJob(jobId: string, patch: AgentJobUpdate): AgentJob {
     executionBudget,
     status,
     blockedReason: budgetReason || (Object.prototype.hasOwnProperty.call(patch, 'blockedReason') ? patch.blockedReason : job.blockedReason),
+    blockedDisposition: status === 'blocked'
+      ? Object.prototype.hasOwnProperty.call(patch, 'blockedDisposition')
+        ? patch.blockedDisposition
+        : job.blockedDisposition
+      : undefined,
+    pausedDisposition: status === 'paused'
+      ? Object.prototype.hasOwnProperty.call(patch, 'pausedDisposition')
+        ? patch.pausedDisposition
+        : job.pausedDisposition
+      : undefined,
     roadmapPhases,
     activeTaskId,
     completedTaskCount,
@@ -966,6 +1047,7 @@ export function advanceWorkbenchRunAfterPacket(params: {
     completedPacketIds: Array.from(new Set([...job.completedPacketIds, params.packetId])),
     currentCommit: params.commitHash || job.currentCommit,
     status,
+    blockedDisposition: status === 'blocked' ? 'resumable' : undefined,
     blockedReason: hasBlockedTask ? 'One or more roadmap tasks are blocked.' : undefined,
     nextActions,
     resumeState: {
@@ -1045,6 +1127,98 @@ export function advanceWorkbenchRunAfterPacket(params: {
 export function listAgentJobs(): AgentJob[] {
   loadJobsFromDisk()
   return Array.from(jobs.values()).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
+}
+
+const LIVE_BLOCKED_PACKET_STATUSES = new Set(['queued', 'running', 'paused'])
+const BLOCKED_EXECUTION_EVIDENCE = new Set([
+  'command_started', 'command_completed', 'command_failed',
+  'validation_started', 'validation_completed', 'validation_failed',
+  'packet_claimed', 'packet_started', 'packet_resumed', 'packet_lease_renewed',
+  'file_read', 'file_changed', 'diff_ready', 'task_step_failed'
+])
+
+function hasLiveBlockedPacket(job: AgentJob): boolean {
+  if (!job.activePacketId) return false
+  const packet = getWorkbenchPacketRecord(job.activePacketId)
+  if (!packet || packet.packet.runId !== job.id || packet.packet.sourceId !== job.sourceId) return false
+  if (!LIVE_BLOCKED_PACKET_STATUSES.has(packet.status)) return false
+  if (packet.status !== 'running') return true
+  const expiresAt = Date.parse(packet.leaseExpiresAt || '')
+  return Boolean(packet.leaseToken && Number.isFinite(expiresAt) && expiresAt > Date.now())
+}
+
+function hasBlockedExecutionEvidence(job: AgentJob): boolean {
+  if (job.currentIteration > 0 || job.completedPacketIds.length > 0 || job.metrics.completedPackets > 0) return true
+  if (job.roadmapPhases.some(phase => phase.tasks.some(task => task.status === 'blocked' || task.status === 'failed'))) return true
+  return listAgentEvents({ jobId: job.id, limit: 25 }).events.some(event => BLOCKED_EXECUTION_EVIDENCE.has(event.type))
+}
+
+/** A blocked run is active only when it has explicit or persisted continuation evidence. */
+export function isBlockedWorkbenchRunResumable(job: AgentJob): boolean {
+  if (job.status !== 'blocked') return false
+  if (job.blockedDisposition === 'historical') return false
+  if (job.blockedDisposition === 'resumable') return true
+  const session = getWorkbenchSession(workbenchSessionIdForRun(job.id))
+  const sessionStillBound = session && !('ok' in session)
+    && (session.status === 'active' || session.status === 'paused')
+    && session.activeRunId === job.id
+  return Boolean(hasLiveBlockedPacket(job) || sessionStillBound || hasBlockedExecutionEvidence(job))
+}
+
+export function isPausedWorkbenchRunResumable(job: AgentJob): boolean {
+  if (job.status !== 'paused') return false
+  if (job.pausedDisposition === 'historical') return false
+  if (job.pausedDisposition === 'resumable') return true
+  if (job.blockedReason?.startsWith('Run budget exhausted:') || isReconciledStaleWorkbenchRun(job)) return false
+  return Boolean(hasLiveBlockedPacket(job) || hasBlockedExecutionEvidence(job))
+}
+
+function reconcileHistoricalBlockedWorkbenchRun(job: AgentJob): AgentJob {
+  if (job.status !== 'blocked' || isBlockedWorkbenchRunResumable(job)) return job
+  const originalBlocker = job.blockedReason || 'no persisted continuation evidence'
+  const closed = updateAgentJob(job.id, {
+    status: 'cancelled',
+    blockedDisposition: 'historical',
+    activeTaskId: undefined,
+    activePacketId: undefined,
+    requiresConfirmation: false,
+    confirmationReason: undefined,
+    blockedReason: originalBlocker,
+    summary: `Historical blocked run closed during lifecycle reconciliation. Original blocker: ${originalBlocker}`,
+    nextActions: []
+  })
+  appendAgentEvent({
+    jobId: closed.id,
+    sourceId: closed.sourceId,
+    type: 'job_cancelled',
+    activityKind: 'run_cancelled',
+    message: 'Historical blocked run terminalized during lifecycle reconciliation; persisted evidence was retained.',
+    status: closed.status
+  })
+  return closed
+}
+
+function reconcileHistoricalPausedWorkbenchRun(job: AgentJob): AgentJob {
+  if (job.status !== 'paused' || isPausedWorkbenchRunResumable(job)) return job
+  const originalReason = job.blockedReason || 'no persisted continuation evidence'
+  const closed = updateAgentJob(job.id, {
+    status: 'cancelled',
+    pausedDisposition: 'historical',
+    activeTaskId: undefined,
+    activePacketId: undefined,
+    blockedReason: originalReason,
+    summary: `Historical paused run closed during lifecycle reconciliation. Original reason: ${originalReason}`,
+    nextActions: []
+  })
+  appendAgentEvent({
+    jobId: closed.id,
+    sourceId: closed.sourceId,
+    type: 'job_cancelled',
+    activityKind: 'run_cancelled',
+    message: 'Historical paused run terminalized during lifecycle reconciliation; persisted evidence was retained.',
+    status: closed.status
+  })
+  return closed
 }
 
 function compactText(value: string | undefined, limit = COMPACT_TEXT_LIMIT): string | undefined {
@@ -1229,6 +1403,7 @@ export function controlAgentJob(jobId: string, action: AgentJobControlAction, re
     const budgetedJob = persistRunBudgetState(job, budget, budget.reasonCode)
     return updateAgentJob(jobId, {
       status: 'paused',
+      pausedDisposition: 'resumable',
       summary: safeReason ? `Sequential run paused: ${safeReason}` : 'Sequential run paused.',
       nextActions: ['Resume, cancel, or ask Custom GPT for targeted reasoning/coding before continuing.'],
       blockedReason: budgetedJob.blockedReason
@@ -1242,6 +1417,7 @@ export function controlAgentJob(jobId: string, action: AgentJobControlAction, re
     persistRunBudgetState(job, budget)
     return updateAgentJob(jobId, {
       status: 'running',
+      pausedDisposition: undefined,
       summary: safeReason ? `Sequential run resumed: ${safeReason}` : 'Sequential run resumed.',
       nextActions: ['Local deterministic runtime can continue. Poll compact status/events for progress.'],
       blockedReason: undefined
@@ -1251,6 +1427,7 @@ export function controlAgentJob(jobId: string, action: AgentJobControlAction, re
     if (job.status === 'completed' || job.status === 'failed' || job.status === 'cancelled') throw new Error(`Cannot cancel job in ${job.status} state`)
     return updateAgentJob(jobId, {
       status: 'cancelled',
+      pausedDisposition: 'historical',
       summary: safeReason ? `Sequential run cancelled: ${safeReason}` : 'Sequential run cancelled.',
       nextActions: ['Start a new bounded sequential job when ready.'],
       blockedReason: undefined,
@@ -1271,9 +1448,8 @@ export function getActiveWorkbenchRun(sourceId: string): Record<string, unknown>
   const candidates = sourceJobs.filter(job =>
     job.sourceId === normalizedSourceId && !['completed', 'failed', 'cancelled'].includes(job.status)
   )
-  const reconciled = candidates.map(job => reconcileStaleWorkbenchRun(job))
+  const reconciled = candidates.map(job => reconcileHistoricalPausedWorkbenchRun(reconcileHistoricalBlockedWorkbenchRun(reconcileStaleWorkbenchRun(job))))
   const active = reconciled.find(job => ['queued', 'running', 'needs_confirmation'].includes(job.status))
-    || reconciled[0]
     || sourceJobs.find(job => job.status === 'completed' && Date.now() - Date.parse(job.updatedAt) <= COMPLETED_RUN_PROJECTION_RETENTION_MS)
   if (!active) return undefined
   requireWorkbenchRunSession(active)
@@ -1319,10 +1495,30 @@ export function getActiveWorkbenchRun(sourceId: string): Record<string, unknown>
 
 /** Resolve every non-terminal run from one persisted job-store read. */
 export function listActiveWorkbenchRuns(): Array<Record<string, unknown> & { sourceId: string; status: string }> {
+  let historicalReconciliationsRemaining = MAX_HISTORICAL_RUN_RECONCILIATIONS_PER_PROJECTION
+  const shouldReconcileHistoricalRun = (job: AgentJob): boolean => {
+    if (historicalReconciliationsRemaining <= 0) return false
+    if (job.status === 'paused') {
+      return job.pausedDisposition === 'historical'
+        || job.blockedReason?.startsWith('Run budget exhausted:') === true
+        || isReconciledStaleWorkbenchRun(job)
+    }
+    return job.status === 'blocked' && job.blockedDisposition !== 'resumable'
+  }
+  const reconcileBoundedHistoricalRun = (job: AgentJob): AgentJob => {
+    if (!shouldReconcileHistoricalRun(job)) return job
+    const reconciled = reconcileHistoricalPausedWorkbenchRun(reconcileHistoricalBlockedWorkbenchRun(job))
+    if (reconciled !== job) historicalReconciliationsRemaining -= 1
+    return reconciled
+  }
   return listAgentJobs()
-    .filter(job => ['queued', 'running', 'needs_confirmation', 'blocked'].includes(job.status))
-    .map(job => {
-      const active = reconcileStaleWorkbenchRun(job)
+    .filter(job => !['completed', 'failed', 'cancelled'].includes(job.status))
+    .map(job => reconcileStaleWorkbenchRun(job))
+    .map(reconcileBoundedHistoricalRun)
+    .filter(job => ['queued', 'running', 'needs_confirmation', 'paused', 'blocked'].includes(job.status))
+    .filter(job => job.status !== 'blocked' || (job.blockedDisposition !== 'historical' && isBlockedWorkbenchRunResumable(job)))
+    .filter(job => job.status !== 'paused' || (job.pausedDisposition !== 'historical' && job.blockedReason?.startsWith('Run budget exhausted:') !== true && !isReconciledStaleWorkbenchRun(job) && isPausedWorkbenchRunResumable(job)))
+    .map(active => {
       requireWorkbenchRunSession(active)
       const compact = compactAgentJob(active)
       const resumeProjection = active.resumeProjection && isResumeProjectionFresh(active.resumeProjection, { run: active })
@@ -1341,6 +1537,7 @@ export function listActiveWorkbenchRuns(): Array<Record<string, unknown> & { sou
         requiresConfirmation: compact.requiresConfirmation,
         confirmationReason: compact.confirmationReason,
         blockedReason: compact.blockedReason,
+        ...(active.status === 'blocked' || active.status === 'paused' ? { resumable: true } : {}),
         activeTask: compact.activeTask,
         resumeProjection,
         updatedAt: active.updatedAt
@@ -1350,12 +1547,17 @@ export function listActiveWorkbenchRuns(): Array<Record<string, unknown> & { sou
 
 export function reconcileStaleWorkbenchRun(job: AgentJob, now = new Date()): AgentJob {
   if (job.status !== 'running' && job.status !== 'queued') return job
-  const latestEvent = listAgentEvents({ jobId: job.id, limit: 1 }).events[0]?.createdAt
+  const latestEventRecord = listAgentEvents({ jobId: job.id, limit: 1 }).events[0]
+  const latestEvent = latestEventRecord?.createdAt
+  if (isBoundedWorkbenchActionRun(job) && latestEventRecord && ['response_completed', 'read_recovered', 'command_completed', 'task_committed'].includes(latestEventRecord.type)) {
+    return finalizeBoundedWorkbenchActionRun(job.id, 'Bounded repository operation completed with persisted evidence.')
+  }
   const assessment = assessWorkbenchRunLiveness({
     status: job.status,
     updatedAt: job.updatedAt,
     lastEventAt: latestEvent,
-    now: now.toISOString()
+    now: now.toISOString(),
+    staleAfterMs: isBoundedWorkbenchActionRun(job) ? WORKBENCH_ACTION_RUN_STALE_AFTER_MS : undefined
   })
   if (!assessment.stale) return job
 
@@ -1376,6 +1578,56 @@ export function reconcileStaleWorkbenchRun(job: AgentJob, now = new Date()): Age
     requestId: paused.originRequestId
   })
   return paused
+}
+
+export function isBoundedWorkbenchActionRun(job: Pick<AgentJob, 'goal'>): boolean {
+  return job.goal.startsWith('External Workbench task:') || job.goal.startsWith('External Workbench file task:')
+}
+
+/** Terminalize one-shot Action probes without changing owner-created runs. */
+export function finalizeBoundedWorkbenchActionRun(runId: string, summary: string): AgentJob {
+  const job = getAgentJob(runId)
+  if (!job) throw new Error(`Agent job not found: ${runId}`)
+  if (!isBoundedWorkbenchActionRun(job) || ['completed', 'failed', 'cancelled'].includes(job.status)) return job
+  const completed = updateAgentJob(job.id, {
+    status: 'completed',
+    activeTaskId: undefined,
+    summary,
+    nextActions: []
+  })
+  appendAgentEvent({
+    jobId: completed.id,
+    sourceId: completed.sourceId,
+    type: 'job_completed',
+    activityKind: 'run_completed',
+    message: summary,
+    status: completed.status
+  })
+  return completed
+}
+
+/** Persist a bounded Action rejection without changing owner-created runs. */
+export function blockBoundedWorkbenchActionRun(runId: string, reason: string, summary: string): AgentJob {
+  const job = getAgentJob(runId)
+  if (!job) throw new Error(`Agent job not found: ${runId}`)
+  if (!isBoundedWorkbenchActionRun(job) || ['completed', 'failed', 'cancelled'].includes(job.status)) return job
+  const blocked = updateAgentJob(job.id, {
+    status: 'blocked',
+    blockedDisposition: 'historical',
+    activeTaskId: undefined,
+    blockedReason: reason,
+    summary,
+    nextActions: []
+  })
+  appendAgentEvent({
+    jobId: blocked.id,
+    sourceId: blocked.sourceId,
+    type: 'job_blocked',
+    activityKind: 'run_blocked',
+    message: summary,
+    status: blocked.status
+  })
+  return blocked
 }
 
 export type WorkbenchActionRunBinding = {
@@ -1509,11 +1761,17 @@ export function createWorkbenchRun(params: Parameters<typeof startAgentJob>[0]):
 export function resumeWorkbenchRun(params: { sourceId: string; runId?: string }): AgentJob {
   const sourceId = String(params.sourceId || '').trim()
   if (!sourceId) throw new Error('sourceId is required')
-  const run = params.runId
-    ? getAgentJob(params.runId)
-    : listAgentJobs().find(job => job.sourceId === sourceId && !['completed', 'failed', 'cancelled'].includes(job.status))
+  const requested = params.runId ? getAgentJob(params.runId) : undefined
+  const run = requested
+    ? reconcileHistoricalBlockedWorkbenchRun(requested)
+    : listAgentJobs()
+      .filter(job => job.sourceId === sourceId && !['completed', 'failed', 'cancelled'].includes(job.status))
+      .map(job => reconcileHistoricalPausedWorkbenchRun(reconcileHistoricalBlockedWorkbenchRun(job)))
+      .find(job => ['queued', 'running', 'paused', 'needs_confirmation'].includes(job.status) || (job.status === 'blocked' && isBlockedWorkbenchRunResumable(job)))
   const now = new Date().toISOString()
-  const resumeCandidate = run?.status === 'paused'
+  const resumeCandidate = run?.status === 'blocked' && isBlockedWorkbenchRunResumable(run)
+    ? { ...run, blockedDisposition: 'resumable' as const }
+    : run?.status === 'paused'
     ? { ...run, executionBudget: resumeRunExecutionBudget(run.executionBudget, now) }
     : run
   const decision = evaluateResumeWorkflow({
@@ -1538,7 +1796,9 @@ export function resumeWorkbenchRun(params: { sourceId: string; runId?: string })
       userSupervisionEvents: run.metrics.userSupervisionEvents + 1
     },
     summary: `Workbench run resumed from projection ${decision.projection?.contentHash || 'rebuilt'}. ${decision.nextAction}`,
-    blockedReason: undefined
+    blockedReason: undefined,
+    blockedDisposition: undefined,
+    pausedDisposition: undefined
   })
 }
 

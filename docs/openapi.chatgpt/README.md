@@ -11,9 +11,9 @@ endpoint. New configurations should use:
 https://mastermind.prochat.tools/api/openapi
 ```
 
-`https://workbench.prochat.tools/api/openapi` is retained for compatibility
-with existing imports. A localhost URL is suitable for local inspection, but
-ChatGPT-hosted Actions require an HTTPS endpoint it can reach.
+`https://workbench.prochat.tools/api/openapi` is retired and must not be used
+for imports. A localhost URL is suitable for local inspection, but
+ChatGPT-hosted Actions require the canonical HTTPS endpoint it can reach.
 
 ## Canonical operations
 

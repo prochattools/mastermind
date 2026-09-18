@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-echo "=== BuildFlow Production Start ==="
+echo "=== Mastermind Production Start ==="
 
 # Kill stale processes
 lsof -ti:3052 | xargs kill -9 2>/dev/null || true
@@ -25,7 +25,7 @@ WEB_PID=$!
 
 echo "Agent PID: $AGENT_PID"
 echo "Web PID: $WEB_PID"
-echo "=== BuildFlow running in production mode ==="
+echo "=== Mastermind running in production mode ==="
 echo "Agent: http://localhost:3052"
 echo "Web: http://localhost:3054"
 

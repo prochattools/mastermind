@@ -192,6 +192,7 @@ export function dispatchWorkbenchGoal(params: {
   if (!preflight.accepted) {
     const blocked = updateAgentJob(run.id, {
       status: 'blocked',
+      blockedDisposition: 'historical',
       blockedReason: preflight.errors[0]?.message || 'Goal dispatch packet was rejected during preflight.',
       summary: 'Workbench rejected the durable goal packet before any local write.'
     })
@@ -206,7 +207,7 @@ export function dispatchWorkbenchGoal(params: {
   }
   const reservation = reserveWorkbenchPacket({ packet, exactPaths: preflight.exactPaths || [] })
   if (reservation.ok === false) {
-    const blocked = updateAgentJob(run.id, { status: 'blocked', blockedReason: reservation.message, summary: 'Workbench could not reserve the durable goal packet.' })
+    const blocked = updateAgentJob(run.id, { status: 'blocked', blockedDisposition: 'historical', blockedReason: reservation.message, summary: 'Workbench could not reserve the durable goal packet.' })
     return {
       status: 'blocked', verified: false, writesPerformed: false, run: blocked,
       packet: { packetId, taskId, status: 'blocked', exactPaths: preflight.exactPaths || [] },
@@ -222,11 +223,11 @@ export function dispatchWorkbenchGoal(params: {
     const mutation = dispatch.readOnly === true ? undefined : validateGovernedCodexMutationDispatch(dispatch, { preflight })
     if (dispatch.readOnly !== true && (!mutation || mutation.ok === false)) {
       const failure = mutation && mutation.ok === false ? mutation : { code: 'CODEX_MUTATION_SCOPE_REQUIRED', message: 'Automatic Codex mutation requires one exact path admitted by Workbench policy.' }
-      const blocked = updateAgentJob(run.id, { status: 'blocked', blockedReason: failure.message, summary: 'Workbench refused the Codex mutation before execution.' })
+      const blocked = updateAgentJob(run.id, { status: 'blocked', blockedDisposition: 'historical', blockedReason: failure.message, summary: 'Workbench refused the Codex mutation before execution.' })
       return { status: 'blocked', verified: false, writesPerformed: false, run: blocked, packet: { packetId, taskId, status: 'blocked', exactPaths: preflight.exactPaths || [] }, error: { code: failure.code, message: failure.message } }
     }
     if (dispatch.readOnly === true && ((dispatch.reads?.length || 0) + (dispatch.commands?.length || 0) === 0)) {
-      const blocked = updateAgentJob(run.id, { status: 'blocked', blockedReason: 'Automatic Codex delegation is limited to bounded read-only goal packets.', summary: 'Workbench refused to delegate a packet with mutation authority or no bounded read.' })
+      const blocked = updateAgentJob(run.id, { status: 'blocked', blockedDisposition: 'historical', blockedReason: 'Automatic Codex delegation is limited to bounded read-only goal packets.', summary: 'Workbench refused to delegate a packet with mutation authority or no bounded read.' })
       return { status: 'blocked', verified: false, writesPerformed: false, run: blocked, packet: { packetId, taskId, status: 'blocked', exactPaths: preflight.exactPaths || [] }, error: { code: 'CODEX_READ_ONLY_SCOPE_REQUIRED', message: 'Automatic Codex delegation is limited to bounded read-only goal packets.' } }
     }
     const existing = listPersistedDelegationOperations({ packetId })[0]
@@ -240,19 +241,19 @@ export function dispatchWorkbenchGoal(params: {
     const projection = buildResumeProjection({ run: bound, packet: reservation.record, policyIdentity: 'policy-v1' })
     const compiled = compilePromptPacket({ run: bound, projection, packet, execution: { engine: 'codex', profile: 'balanced', outcome: 'selected' }, policyIdentity: 'policy-v1' })
     if (compiled.status !== 'external' || !compiled.contract) {
-      const blocked = updateAgentJob(run.id, { status: 'blocked', blockedReason: compiled.nextAction, summary: 'Workbench could not compile the governed Codex delegation packet.' })
+      const blocked = updateAgentJob(run.id, { status: 'blocked', blockedDisposition: 'historical', blockedReason: compiled.nextAction, summary: 'Workbench could not compile the governed Codex delegation packet.' })
       updateWorkbenchPacketStatus({ packetId, status: 'failed', failureReason: compiled.nextAction })
       return { status: 'blocked', verified: false, writesPerformed: false, run: blocked, packet: { packetId, taskId, status: 'blocked', exactPaths: preflight.exactPaths || [] }, error: { code: compiled.reasonCode.toUpperCase(), message: compiled.nextAction } }
     }
     const preparedDelegation = prepareDelegationOperation({ run: bound, projection, contract: compiled.contract, authorization: 'satisfied', confirmation: 'not_required', now: new Date().toISOString() })
     if (!preparedDelegation.allowed || !preparedDelegation.operation) {
-      const blocked = updateAgentJob(run.id, { status: 'blocked', blockedReason: preparedDelegation.nextAction, summary: 'Workbench could not admit the governed Codex delegation packet.' })
+      const blocked = updateAgentJob(run.id, { status: 'blocked', blockedDisposition: 'historical', blockedReason: preparedDelegation.nextAction, summary: 'Workbench could not admit the governed Codex delegation packet.' })
       updateWorkbenchPacketStatus({ packetId, status: 'failed', failureReason: preparedDelegation.nextAction })
       return { status: 'blocked', verified: false, writesPerformed: false, run: blocked, packet: { packetId, taskId, status: 'blocked', exactPaths: preflight.exactPaths || [] }, error: { code: preparedDelegation.reasonCode.toUpperCase(), message: preparedDelegation.nextAction } }
     }
     const persisted = preparePersistedDelegation(preparedDelegation.operation)
     if (persisted.ok === false) {
-      const blocked = updateAgentJob(run.id, { status: 'blocked', blockedReason: persisted.message, summary: 'Workbench could not persist the Codex delegation operation.' })
+      const blocked = updateAgentJob(run.id, { status: 'blocked', blockedDisposition: 'historical', blockedReason: persisted.message, summary: 'Workbench could not persist the Codex delegation operation.' })
       updateWorkbenchPacketStatus({ packetId, status: 'failed', failureReason: persisted.message })
       return { status: 'blocked', verified: false, writesPerformed: false, run: blocked, packet: { packetId, taskId, status: 'blocked', exactPaths: preflight.exactPaths || [] }, error: { code: persisted.code, message: persisted.message } }
     }
@@ -264,7 +265,7 @@ export function dispatchWorkbenchGoal(params: {
       if (!claimed.ok) {
         const reason = 'message' in claimed ? claimed.message : 'Workbench could not lease the governed Codex mutation packet.'
         const code = 'code' in claimed ? claimed.code : 'PACKET_LEASE_FAILED'
-        const blocked = updateAgentJob(run.id, { status: 'blocked', blockedReason: reason, summary: 'Workbench could not lease the governed Codex mutation packet.' })
+        const blocked = updateAgentJob(run.id, { status: 'blocked', blockedDisposition: 'historical', blockedReason: reason, summary: 'Workbench could not lease the governed Codex mutation packet.' })
         updateWorkbenchPacketStatus({ packetId, status: 'failed', failureReason: reason })
         return { status: 'blocked', verified: false, writesPerformed: false, run: blocked, packet: { packetId, taskId, status: 'blocked', exactPaths: preflight.exactPaths || [] }, error: { code, message: reason } }
       }
@@ -273,7 +274,7 @@ export function dispatchWorkbenchGoal(params: {
       if (!mutationWorktree.ok) {
         const reason = 'message' in mutationWorktree ? mutationWorktree.message : 'Workbench could not create the isolated Codex mutation worktree.'
         const code = 'code' in mutationWorktree ? mutationWorktree.code : 'WORKTREE_CREATE_FAILED'
-        const blocked = updateAgentJob(run.id, { status: 'blocked', blockedReason: reason, summary: 'Workbench could not create the isolated Codex mutation worktree.' })
+        const blocked = updateAgentJob(run.id, { status: 'blocked', blockedDisposition: 'historical', blockedReason: reason, summary: 'Workbench could not create the isolated Codex mutation worktree.' })
         updateWorkbenchPacketStatus({ packetId, status: 'failed', failureReason: reason })
         return { status: 'blocked', verified: false, writesPerformed: false, run: blocked, packet: { packetId, taskId, status: 'blocked', exactPaths: preflight.exactPaths || [] }, error: { code, message: reason } }
       }
@@ -285,13 +286,13 @@ export function dispatchWorkbenchGoal(params: {
       if (result.ok !== false) return
       updateWorkbenchPacketStatus({ packetId, status: 'failed', failureReason: result.reason })
       const failed = getAgentJob(run.id)
-      if (failed) updateAgentJob(failed.id, { status: 'blocked', activePacketId: undefined, blockedReason: result.reason, summary: 'Codex delegation was not accepted; no automatic retry was attempted.' })
+      if (failed) updateAgentJob(failed.id, { status: 'blocked', blockedDisposition: 'historical', activePacketId: undefined, blockedReason: result.reason, summary: 'Codex delegation was not accepted; no automatic retry was attempted.' })
       recordWorkbenchPacketResult({ packetId, runId: run.id, sourceId: params.sourceId, status: 'failed', sourceRoot: params.sourceRoot, error: result.reason })
     }).catch(error => {
       const reason = error instanceof Error ? error.message : String(error)
       updateWorkbenchPacketStatus({ packetId, status: 'failed', failureReason: reason })
       const failed = getAgentJob(run.id)
-      if (failed) updateAgentJob(failed.id, { status: 'blocked', activePacketId: undefined, blockedReason: reason, summary: 'Codex delegation failed before a verified terminal result; no automatic retry was attempted.' })
+      if (failed) updateAgentJob(failed.id, { status: 'blocked', blockedDisposition: 'historical', activePacketId: undefined, blockedReason: reason, summary: 'Codex delegation failed before a verified terminal result; no automatic retry was attempted.' })
       recordWorkbenchPacketResult({ packetId, runId: run.id, sourceId: params.sourceId, status: 'failed', sourceRoot: params.sourceRoot, error: reason })
     })
     return { status: 'queued', verified: true, writesPerformed: false, run: bound, packet: { packetId, taskId, status: 'queued', exactPaths: preflight.exactPaths || [] }, delegation: { operationId: persisted.operation.operationId, lifecycle: 'submitted' } }

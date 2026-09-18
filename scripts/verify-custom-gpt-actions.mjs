@@ -519,7 +519,7 @@ function ensureWorkbenchRunModel() {
     'planVersion: Math.max(job.planVersion',
     'getActiveWorkbenchRun',
     'runSchemaVersion',
-    'fs.renameSync(temporaryPath, JOB_STORE_PATH)'
+    'fs.renameSync(temporaryPath, filePath)'
   ]) {
     assert(modelText.includes(required), `Workbench run model must include ${required}`)
   }

@@ -23,8 +23,9 @@ The Custom GPT contract contains five operations:
 - `commitMastermindChanges`
 - `runMastermindCommand`
 
-The same durable goal and packet model is available from the native macOS
-application and local runtime. The UI surface changes; the source lock,
+The same durable goal and packet model is owned by the local runtime and
+projected through the native macOS menu-bar companion. The dashboard and CLI
+remain advanced/support surfaces. The UI surface changes; the source lock,
 policy, validation, and Git boundaries do not.
 
 ## Quick work
@@ -42,7 +43,10 @@ resume without treating chat history as the source of truth.
 
 ## Product boundary
 
-Mastermind Local is the public local runtime, dashboard, CLI, native macOS
-surface, and Custom GPT contract. It does not require a second model API,
-unrestricted shell access, or automatic push. Optional context providers and
-external executors are adapters and must degrade visibly when unavailable.
+Mastermind Local is the public local runtime, menu-bar companion, advanced
+dashboard/CLI surfaces, and Custom GPT contract. ChatGPT owns normal work
+initiation; users do not need to create local Goals, type local prompts,
+manually activate repositories, or manually index sources. It does not require
+a second model API, unrestricted shell access, or automatic push. Optional
+context providers and external executors are adapters and must degrade visibly
+when unavailable.

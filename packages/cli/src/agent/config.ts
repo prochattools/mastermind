@@ -3,9 +3,9 @@ import path from 'path'
 import crypto from 'crypto'
 import { execFileSync } from 'child_process'
 import { getConfigPath, expandTilde } from '../utils/paths'
-import type { Workspace, KnowledgeSource, ActiveSourcesMode, WriteMode, DiscoveredRepository, SourceDiscoverySettings, SourceDiscoveryTelemetry } from '@mastermind/shared'
-import { getIndexRecord, upsertIndexState, type SourceIndexStatus } from './index-state'
-import { INDEX_SCAN_EXCLUSION_VERSION, INDEX_SCAN_POLICY_ID, INDEX_SCAN_POLICY_VERSION, type IndexScanFailureCode } from './index-scan-policy'
+import { createSourceIdentityResolver, type Workspace, type KnowledgeSource, type ActiveSourcesMode, type WriteMode, type DiscoveredRepository, type SourceDiscoverySettings, type SourceDiscoveryTelemetry } from '@mastermind/shared'
+import { getIndexRecord, upsertIndexState, type SourceFreshnessState, type SourceIndexStatus } from './index-state'
+import { INDEX_SCAN_EXCLUSION_VERSION, INDEX_SCAN_POLICY_ID, INDEX_SCAN_POLICY_VERSION, INDEX_SCHEMA_VERSION, type IndexScanFailureCode } from './index-scan-policy'
 
 export const DEFAULT_AUTO_INDEX_ENABLED = false
 export const DEFAULT_AUTO_INDEX_INTERVAL_MINUTES = 5
@@ -14,7 +14,7 @@ export const MAX_AUTO_INDEX_INTERVAL_MINUTES = 60
 export const DEFAULT_REPO_DISCOVERY_INTERVAL_MINUTES = 30
 export const MIN_REPO_DISCOVERY_INTERVAL_MINUTES = 10
 export const MAX_REPO_DISCOVERY_INTERVAL_MINUTES = 60
-export const DEFAULT_REPO_DISCOVERY_IGNORE_PATTERNS = ['.git', '.obsidian', 'node_modules', '.next', '.build', 'dist', 'build', 'coverage', '.cache', '.turbo']
+export const DEFAULT_REPO_DISCOVERY_IGNORE_PATTERNS = ['.git', '.obsidian', 'node_modules', '.next', '.build', 'dist', 'build', 'coverage', '.cache', '.turbo', 'vendor', 'generated', '.pnpm-store', 'DerivedData']
 export const DEFAULT_REPO_DISCOVERY_TRUST_MODE = 'git_non_symlink' as const
 export const MAX_REPO_DISCOVERY_DEPTH = 5
 export const MAX_REPO_DISCOVERY_RESULTS = 200
@@ -23,6 +23,24 @@ const GIT_METADATA_TIMEOUT_MS = 1500
 const GIT_METADATA_CACHE_TTL_MS = 5 * 60_000
 
 const gitMetadataCache = new Map<string, { data: Partial<KnowledgeSource>; expiresAt: number }>()
+const sourceIndexBindingCache = new Map<string, { data: SourceIndexBinding | undefined; expiresAt: number }>()
+const SOURCE_INDEX_BINDING_CACHE_TTL_MS = 2_000
+const sourceIdentityResolver = createSourceIdentityResolver()
+
+export function resolveConfiguredSourceId(sourceId: string, sources: readonly KnowledgeSource[] = getSourcesSafe({ refreshGitMetadata: false, includeIndexState: false })): string {
+  const identities = sources.map(source => ({ id: source.id, label: source.label, ...(source.branchName ? { branch: source.branchName } : {}) }))
+  const resolution = sourceIdentityResolver(sourceId, identities)
+  if (resolution.status === 'ambiguous') throw new Error(`Ambiguous sourceId: ${sourceId}`)
+  if (resolution.status === 'unknown') throw new Error(`Source not found: ${sourceId}`)
+
+  const canonical = sources.find(source => source.id === resolution.identity.id)
+  if (canonical) return canonical.id
+  if (resolution.status === 'alias') {
+    const legacy = sources.find(source => source.id === resolution.legacy.id)
+    if (legacy) return legacy.id
+  }
+  throw new Error(`Source not found: ${sourceId}`)
+}
 
 export function clearGitMetadataCache(sourcePath?: string): void {
   if (sourcePath) {
@@ -30,6 +48,12 @@ export function clearGitMetadataCache(sourcePath?: string): void {
     gitMetadataCache.delete(expanded)
   } else {
     gitMetadataCache.clear()
+  }
+  if (sourcePath) {
+    const configured = loadConfig()?.sources?.find(item => expandTilde(item.path) === expandTilde(sourcePath))
+    if (configured) sourceIndexBindingCache.delete(configured.id)
+  } else {
+    sourceIndexBindingCache.clear()
   }
 }
 
@@ -189,19 +213,61 @@ function runGit(sourcePath: string, args: string[]): string | undefined {
 
 export type SourceIndexBinding = {
   sourceRevision?: string
+  sourceBranchName?: string
   sourcePathIdentity?: string
   sourceWorktreeIdentity?: string
   indexPolicyVersion: string
   indexExclusionVersion: string
   indexPolicyIdentity: string
+  indexSchemaVersion: string
 }
 
 function hashSourceIdentity(value: string): string {
   return crypto.createHash('sha256').update(value, 'utf8').digest('hex').slice(0, 32)
 }
 
+const WORKTREE_NOISE_DIRECTORIES = new Set([
+  '.git', '.obsidian', 'node_modules', '.next', '.build', 'dist', 'build', 'coverage',
+  '.cache', '.turbo', 'vendor', 'generated', '.pnpm-store', 'DerivedData'
+])
+
+function meaningfulWorktreePath(value: string): boolean {
+  const normalized = value.replace(/\\/g, '/').replace(/^\"|\"$/g, '')
+  if (!normalized || normalized === '.') return false
+  if (normalized.split('/').some(part => WORKTREE_NOISE_DIRECTORIES.has(part))) return false
+  if (normalized.endsWith('.lock') || normalized.endsWith('~')) return false
+  return true
+}
+
+function meaningfulWorktreeIdentity(canonicalPath: string, revision: string | undefined, branch: string | undefined, status: string | undefined): string | undefined {
+  if (status === undefined) return undefined
+  const entries = status
+    .split('\0')
+    .filter(entry => entry && !entry.startsWith('#'))
+    .flatMap(entry => {
+      const tabIndex = entry.indexOf('\t')
+      return tabIndex >= 0 ? entry.slice(tabIndex + 1).split('\0') : [entry.startsWith('? ') ? entry.slice(2) : entry.slice(3)]
+    })
+    .map(item => item.trim())
+    .filter(meaningfulWorktreePath)
+    .sort()
+  const signatures = entries.map(item => {
+    const renameParts = item.split(' -> ')
+    const candidate = renameParts[renameParts.length - 1] || item
+    try {
+      const stat = fs.statSync(path.join(canonicalPath, candidate))
+      return `${item}:${stat.size}:${stat.mtimeMs}:${stat.mode}`
+    } catch {
+      return `${item}:missing`
+    }
+  })
+  return hashSourceIdentity(`${canonicalPath}\n${revision || ''}\n${branch || ''}\n${signatures.join('\n')}`)
+}
+
 /** Bind an index to the canonical source path, Git HEAD/worktree state, and scan policy. */
 export function getSourceIndexBinding(sourceId: string): SourceIndexBinding | undefined {
+  const cached = sourceIndexBindingCache.get(sourceId)
+  if (cached && cached.expiresAt > Date.now()) return cached.data
   const config = loadConfig()
   // Binding one source must not hydrate Git metadata for every configured
   // source. This function is used by readiness projection and startup
@@ -209,19 +275,27 @@ export function getSourceIndexBinding(sourceId: string): SourceIndexBinding | un
   const source = config
     ? getAllConfiguredSources(config, { refreshGitMetadata: false }).find(item => item.id === sourceId)
     : undefined
-  if (!source) return undefined
+  if (!source) {
+    sourceIndexBindingCache.set(sourceId, { data: undefined, expiresAt: Date.now() + SOURCE_INDEX_BINDING_CACHE_TTL_MS })
+    return undefined
+  }
   let canonicalPath = expandTilde(source.path)
   try { canonicalPath = fs.realpathSync(canonicalPath) } catch { /* the scanner will report the precise I/O failure */ }
   const sourceRevision = runGit(source.path, ['rev-parse', 'HEAD'])
-  const worktreeStatus = runGit(source.path, ['status', '--porcelain=v1', '--untracked-files=all'])
-  return {
+  const sourceBranchName = runGit(source.path, ['branch', '--show-current']) || (sourceRevision ? `detached:${sourceRevision}` : undefined)
+  const worktreeStatus = runGit(source.path, ['status', '--porcelain=v1', '-z', '--untracked-files=all'])
+  const binding: SourceIndexBinding = {
     sourceRevision,
+    sourceBranchName,
     sourcePathIdentity: hashSourceIdentity(canonicalPath),
-    sourceWorktreeIdentity: worktreeStatus === undefined ? undefined : hashSourceIdentity(`${canonicalPath}\n${sourceRevision || ''}\n${worktreeStatus}`),
+    sourceWorktreeIdentity: meaningfulWorktreeIdentity(canonicalPath, sourceRevision, sourceBranchName, worktreeStatus),
     indexPolicyVersion: INDEX_SCAN_POLICY_VERSION,
     indexExclusionVersion: INDEX_SCAN_EXCLUSION_VERSION,
-    indexPolicyIdentity: INDEX_SCAN_POLICY_ID
+    indexPolicyIdentity: INDEX_SCAN_POLICY_ID,
+    indexSchemaVersion: INDEX_SCHEMA_VERSION
   }
+  sourceIndexBindingCache.set(sourceId, { data: binding, expiresAt: Date.now() + SOURCE_INDEX_BINDING_CACHE_TTL_MS })
+  return binding
 }
 
 function resolveGitPath(sourcePath: string, gitPath: string | undefined): string | undefined {
@@ -337,11 +411,23 @@ function getSourceIndexStatus(source: KnowledgeSource): {
   indexError?: string
   indexFailureCode?: IndexScanFailureCode
   sourceRevision?: string
+  observedRevision?: string
+  sourceBranchName?: string
+  observedBranchName?: string
   sourcePathIdentity?: string
   sourceWorktreeIdentity?: string
+  observedWorktreeIdentity?: string
   indexPolicyVersion?: string
   indexExclusionVersion?: string
   indexPolicyIdentity?: string
+  indexSchemaVersion?: string
+  indexGeneration?: string
+  freshnessState?: SourceFreshnessState
+  refreshReason?: string
+  changedPathCount?: number
+  lastRefreshFailureAt?: string
+  retryCount?: number
+  retryAfterAt?: string
 } {
   const record = getIndexRecord(source.id)
   if (source.enabled === false) {
@@ -367,6 +453,7 @@ function getSourceIndexStatus(source: KnowledgeSource): {
     const policyBindingMissing = record.indexPolicyVersion !== INDEX_SCAN_POLICY_VERSION
       || record.indexExclusionVersion !== INDEX_SCAN_EXCLUSION_VERSION
       || record.indexPolicyIdentity !== INDEX_SCAN_POLICY_ID
+      || record.indexSchemaVersion !== INDEX_SCHEMA_VERSION
       || !record.sourcePathIdentity
     if (record.indexStatus === 'ready') {
       if (!record.lastIndexedAt) {
@@ -399,11 +486,29 @@ function getSourceIndexStatus(source: KnowledgeSource): {
           indexError: 'Indexed source revision is missing; rebuild the source index.'
         }
       }
+      const observedFields = {
+        ...(currentRevision ? { observedRevision: currentRevision } : {}),
+        ...(currentBinding?.sourceBranchName ? { observedBranchName: currentBinding.sourceBranchName } : {}),
+        ...(currentBinding?.sourceWorktreeIdentity ? { observedWorktreeIdentity: currentBinding.sourceWorktreeIdentity } : {})
+      }
+      if (source.availabilityStatus === 'stale') {
+        return {
+          ...record,
+          ...observedFields,
+          indexed: false,
+          indexStatus: 'pending',
+          freshnessState: 'stale',
+          indexFailureCode: 'RECONCILIATION_REQUIRED',
+          indexError: source.availabilityReason || 'Source availability changed; automatic refresh is scheduled.'
+        }
+      }
       if (currentBinding?.sourcePathIdentity && record.sourcePathIdentity !== currentBinding.sourcePathIdentity) {
         return {
           ...record,
+          ...observedFields,
           indexed: false,
           indexStatus: 'pending',
+          freshnessState: 'stale',
           indexFailureCode: 'RECONCILIATION_REQUIRED',
           indexError: 'Canonical source path changed after the last completed index.'
         }
@@ -411,8 +516,10 @@ function getSourceIndexStatus(source: KnowledgeSource): {
       if (record.sourceRevision && currentRevision && record.sourceRevision !== currentRevision) {
         return {
           ...record,
+          ...observedFields,
           indexed: false,
           indexStatus: 'pending',
+          freshnessState: 'stale',
           indexFailureCode: 'RECONCILIATION_REQUIRED',
           indexError: 'Source HEAD changed after the last completed index.'
         }
@@ -420,23 +527,30 @@ function getSourceIndexStatus(source: KnowledgeSource): {
       if (currentBinding?.sourceWorktreeIdentity && record.sourceWorktreeIdentity !== currentBinding.sourceWorktreeIdentity) {
         return {
           ...record,
+          ...observedFields,
           indexed: false,
           indexStatus: 'pending',
+          freshnessState: 'stale',
           indexFailureCode: 'RECONCILIATION_REQUIRED',
           indexError: 'Source worktree changed after the last completed index.'
         }
       }
+      return { ...record, ...observedFields, freshnessState: record.freshnessState || 'ready' }
     }
     if (policyBindingMissing && record.indexStatus !== 'indexing') {
       return {
         ...record,
         indexed: false,
         indexStatus: 'pending',
+        freshnessState: 'stale',
         indexFailureCode: 'STALE_POLICY',
         indexError: 'Index policy changed; automatic source reconciliation is scheduled.'
       }
     }
-    return record
+    return {
+      ...record,
+      freshnessState: record.freshnessState || (record.indexStatus === 'indexing' ? 'refreshing' : record.indexStatus === 'pending' ? 'preparing' : record.indexStatus === 'failed' ? 'needs_attention' : 'discovered')
+    }
   }
   return {
     indexed: false,
@@ -463,13 +577,51 @@ export function withSourceIndexState(source: KnowledgeSource): KnowledgeSource &
   indexPolicyVersion?: string
   indexExclusionVersion?: string
   indexPolicyIdentity?: string
+  indexSchemaVersion?: string
+  indexGeneration?: string
+  freshnessState?: SourceFreshnessState
+  refreshReason?: string
+  changedPathCount?: number
+  lastRefreshFailureAt?: string
+  retryCount?: number
+  retryAfterAt?: string
+  availabilityStatus: NonNullable<KnowledgeSource['availabilityStatus']>
+  availabilityReason?: string
 } {
-  return { ...source, ...getSourceIndexStatus(source) }
+  const indexState = getSourceIndexStatus(source)
+  const availability = getSourceAvailability(source, indexState)
+  return { ...source, ...indexState, ...availability }
+}
+
+export function getSourceAvailability(
+  source: KnowledgeSource,
+  indexState: ReturnType<typeof getSourceIndexStatus> = getSourceIndexStatus(source)
+): { availabilityStatus: NonNullable<KnowledgeSource['availabilityStatus']>; availabilityReason?: string } {
+  if (source.availabilityStatus === 'unavailable' || source.availabilityStatus === 'removed') {
+    return { availabilityStatus: source.availabilityStatus, ...(source.availabilityReason ? { availabilityReason: source.availabilityReason } : {}) }
+  }
+  if (source.enabled === false) return { availabilityStatus: 'unavailable', availabilityReason: 'Source is disabled.' }
+  if (!isSourcePathAvailable(source.path)) return { availabilityStatus: 'unavailable', availabilityReason: 'Source path is unavailable.' }
+  if (source.availabilityStatus === 'stale' && !(indexState.indexStatus === 'ready' && indexState.indexed === true)) {
+    return { availabilityStatus: 'stale', availabilityReason: source.availabilityReason || 'Source was not present in the latest authoritative discovery scan.' }
+  }
+  if (indexState.indexStatus === 'failed') return { availabilityStatus: 'needs_attention', availabilityReason: indexState.indexError || 'Source preparation failed.' }
+  if (indexState.freshnessState === 'stale') return { availabilityStatus: 'stale', availabilityReason: indexState.indexError || 'Source changed; automatic refresh is scheduled.' }
+  if (indexState.freshnessState === 'refreshing') return { availabilityStatus: 'preparing', availabilityReason: 'Source index is refreshing.' }
+  if (indexState.indexStatus === 'ready' && indexState.indexed === true) return { availabilityStatus: 'ready' }
+  if (indexState.indexStatus === 'pending' || indexState.indexStatus === 'indexing') return { availabilityStatus: 'preparing' }
+  return { availabilityStatus: 'discovered', availabilityReason: 'Source is registered and awaiting preparation.' }
 }
 
 export function getSourceIndexState(sourceId: string): ReturnType<typeof getSourceIndexStatus> | null {
   const sources = getAllConfiguredSources(loadConfig() ?? ({} as AgentConfig))
-  const source = sources.find(item => item.id === sourceId)
+  let resolvedSourceId: string
+  try {
+    resolvedSourceId = resolveConfiguredSourceId(sourceId, sources)
+  } catch {
+    return null
+  }
+  const source = sources.find(item => item.id === resolvedSourceId)
   if (!source) return null
   return getSourceIndexStatus(source)
 }
@@ -479,7 +631,12 @@ export function reconcileActiveSources(config: AgentConfig, options: SourceHydra
   const enabledSources = allSources.filter(source => source.enabled && isSourcePathAvailable(source.path))
   const enabledIds = new Set(enabledSources.map(source => source.id))
   const currentMode = config.activeSourcesMode || 'all'
-  const currentActiveIds = Array.from(new Set((config.activeSourceIds || []).filter(id => typeof id === 'string' && id.length > 0)))
+  const currentActiveIds = Array.from(new Set((config.activeSourceIds || [])
+    .filter(id => typeof id === 'string' && id.length > 0)
+    .map(id => {
+      try { return resolveConfiguredSourceId(id, allSources) } catch { return undefined }
+    })
+    .filter((id): id is string => Boolean(id))))
   const filteredActiveIds = currentActiveIds.filter(id => enabledIds.has(id))
 
   let nextMode: ActiveSourcesMode = currentMode
@@ -520,6 +677,14 @@ export function generateSourceIdFromPath(sourcePath: string): string {
   return path.basename(sourcePath).toLowerCase().replace(/[^a-z0-9-]/g, '-')
 }
 
+/** Stable ID for sources admitted by bounded automatic discovery.
+ * Existing manually assigned IDs are always preferred during reconciliation.
+ */
+export function generateDiscoveredSourceId(sourcePath: string): string {
+  const canonical = canonicalConfiguredSourcePath(sourcePath)
+  return `auto-${crypto.createHash('sha256').update(canonical, 'utf8').digest('hex').slice(0, 24)}`
+}
+
 function normalizeDiscoveryIntervalMinutes(value: unknown): number {
   const numeric = typeof value === 'number' ? value : Number(value)
   if (!Number.isFinite(numeric)) return DEFAULT_REPO_DISCOVERY_INTERVAL_MINUTES
@@ -538,14 +703,19 @@ function normalizeDiscoveryNamingPattern(value: unknown): string | undefined {
   return value
 }
 
-function canonicalDiscoveryDirectory(input: string, label: string): string {
+function canonicalDiscoveryDirectory(input: string, label: string, requireExisting = true): string {
   const expanded = expandTilde(input.trim())
   if (!expanded || expanded.includes('\0')) throw new Error(`Invalid discovery ${label}`)
-  const stat = fs.lstatSync(expanded)
-  if (stat.isSymbolicLink()) throw new Error(`Discovery ${label} must not be a symlink`)
-  if (!stat.isDirectory()) throw new Error(`Discovery ${label} is not a directory`)
-  fs.accessSync(expanded, fs.constants.R_OK)
-  return fs.realpathSync(expanded)
+  try {
+    const stat = fs.lstatSync(expanded)
+    if (stat.isSymbolicLink()) throw new Error(`Discovery ${label} must not be a symlink`)
+    if (!stat.isDirectory()) throw new Error(`Discovery ${label} is not a directory`)
+    fs.accessSync(expanded, fs.constants.R_OK)
+    return fs.realpathSync(expanded)
+  } catch (error) {
+    if (!requireExisting && error && typeof error === 'object' && 'code' in error && (error as NodeJS.ErrnoException).code === 'ENOENT') return path.resolve(expanded)
+    throw error
+  }
 }
 
 function isWithinDirectory(candidate: string, root: string): boolean {
@@ -558,9 +728,9 @@ function canonicalConfiguredSourcePath(sourcePath: string): string {
   try { return fs.realpathSync(expanded) } catch { return path.resolve(expanded) }
 }
 
-function normalizeDiscoveryAllowedRoots(value: unknown, fallbackRoot?: string): string[] {
+function normalizeDiscoveryAllowedRoots(value: unknown, fallbackRoot?: string, requireExisting = false): string[] {
   const raw = Array.isArray(value) ? value : (fallbackRoot ? [fallbackRoot] : [])
-  return Array.from(new Set(raw.filter((item): item is string => typeof item === 'string' && item.trim().length > 0).map(item => canonicalDiscoveryDirectory(item, 'allowed root')))).slice(0, 20)
+  return Array.from(new Set(raw.filter((item): item is string => typeof item === 'string' && item.trim().length > 0).map(item => canonicalDiscoveryDirectory(item, 'allowed root', requireExisting)))).slice(0, 20)
 }
 
 function matchesDiscoveryPattern(value: string, pattern: string): boolean {
@@ -586,9 +756,14 @@ function prettifyRepoLabel(name: string): string {
 export function getSourceDiscoverySettings(): SourceDiscoverySettings {
   const config = loadConfig()
   const configuredRoot = config?.sourceDiscovery?.rootPath
-  const allowedRoots = normalizeDiscoveryAllowedRoots(config?.sourceDiscovery?.allowedRoots, configuredRoot)
+  const configuredRoots = Array.from(new Set([
+    ...(Array.isArray(config?.sourceDiscovery?.rootPaths) ? config!.sourceDiscovery!.rootPaths! : []),
+    ...(configuredRoot ? [configuredRoot] : [])
+  ].filter((item): item is string => typeof item === 'string' && item.trim().length > 0).map(item => canonicalDiscoveryDirectory(item, 'root', false))))
+  const allowedRoots = normalizeDiscoveryAllowedRoots(config?.sourceDiscovery?.allowedRoots, configuredRoots[0], false)
   return {
-    rootPath: configuredRoot ? canonicalDiscoveryDirectory(configuredRoot, 'root') : undefined,
+    rootPath: configuredRoots[0],
+    ...(configuredRoots.length > 1 ? { rootPaths: configuredRoots } : {}),
     ...(allowedRoots.length ? { allowedRoots } : {}),
     ignorePatterns: normalizeDiscoveryPatterns(config?.sourceDiscovery?.ignorePatterns),
     ...(normalizeDiscoveryNamingPattern(config?.sourceDiscovery?.namingPattern) ? { namingPattern: normalizeDiscoveryNamingPattern(config?.sourceDiscovery?.namingPattern) } : {}),
@@ -598,16 +773,26 @@ export function getSourceDiscoverySettings(): SourceDiscoverySettings {
   }
 }
 
-export function setSourceDiscoverySettings(settings: { rootPath?: string; allowedRoots?: string[]; ignorePatterns?: string[]; namingPattern?: string; intervalMinutes?: number; lastScannedAt?: string }): SourceDiscoverySettings {
+export function setSourceDiscoverySettings(settings: { rootPath?: string; rootPaths?: string[]; allowedRoots?: string[]; ignorePatterns?: string[]; namingPattern?: string; intervalMinutes?: number; lastScannedAt?: string; allowMissingRoots?: boolean }): SourceDiscoverySettings {
   const config = loadConfig()
   if (!config) throw new Error('Please run: buildflow init')
   const current = getSourceDiscoverySettings()
-  const rootPath = settings.rootPath !== undefined ? canonicalDiscoveryDirectory(settings.rootPath, 'root') : current.rootPath
-  const requestedRootReplacesAllowlist = settings.rootPath !== undefined && settings.allowedRoots === undefined
-  const allowedRoots = normalizeDiscoveryAllowedRoots(requestedRootReplacesAllowlist ? [rootPath] : (settings.allowedRoots ?? current.allowedRoots), rootPath)
-  if (rootPath && !allowedRoots.some(allowedRoot => isWithinDirectory(rootPath, allowedRoot))) throw new Error('Discovery root must be within an allowed root')
+  const explicitRoots = settings.rootPaths !== undefined
+    ? settings.rootPaths
+    : settings.rootPath !== undefined
+      ? [settings.rootPath]
+      : (current.rootPaths ?? (current.rootPath ? [current.rootPath] : []))
+  const rootPaths = Array.from(new Set(explicitRoots.filter(item => typeof item === 'string' && item.trim().length > 0).map(item => canonicalDiscoveryDirectory(item, 'root', settings.allowMissingRoots === true ? false : true)))).slice(0, 20)
+  const rootPath = rootPaths[0]
+  const requestedRootReplacesAllowlist = settings.rootPath !== undefined || settings.rootPaths !== undefined
+  const allowedRootInput = settings.allowedRoots !== undefined
+    ? settings.allowedRoots
+    : (requestedRootReplacesAllowlist ? rootPaths : current.allowedRoots)
+  const allowedRoots = normalizeDiscoveryAllowedRoots(allowedRootInput, rootPath, settings.allowMissingRoots === true ? false : true)
+  if (rootPaths.some(root => !allowedRoots.some(allowedRoot => isWithinDirectory(root, allowedRoot)))) throw new Error('Discovery root must be within an allowed root')
   config.sourceDiscovery = {
     ...(rootPath ? { rootPath } : {}),
+    ...(rootPaths.length > 1 ? { rootPaths } : {}),
     ...(allowedRoots.length ? { allowedRoots } : {}),
     ignorePatterns: normalizeDiscoveryPatterns(settings.ignorePatterns ?? current.ignorePatterns),
     ...(normalizeDiscoveryNamingPattern(settings.namingPattern ?? current.namingPattern) ? { namingPattern: normalizeDiscoveryNamingPattern(settings.namingPattern ?? current.namingPattern) } : {}),
@@ -621,12 +806,11 @@ export function setSourceDiscoverySettings(settings: { rootPath?: string; allowe
 
 export function discoverRepositories(rootPathInput?: string): { settings: SourceDiscoverySettings; repositories: DiscoveredRepository[]; telemetry: SourceDiscoveryTelemetry } {
   const settings = rootPathInput ? setSourceDiscoverySettings({ rootPath: rootPathInput }) : getSourceDiscoverySettings()
-  if (!settings.rootPath) return { settings, repositories: [], telemetry: { entriesExamined: 0, maxDepth: 0, resultsEmitted: 0, terminationReason: 'completed' } }
-  const rootPath = expandTilde(settings.rootPath)
-  const displayRootPath = rootPathInput ? path.resolve(expandTilde(rootPathInput.trim())) : rootPath
-  const allowedRoots = settings.allowedRoots ?? [rootPath]
-  if (!allowedRoots.some(allowedRoot => isWithinDirectory(rootPath, allowedRoot))) throw new Error('Discovery root is outside the allowed roots')
-  const configured = getSourcesSafe()
+  const rootPaths = rootPathInput ? [expandTilde(settings.rootPath || rootPathInput)] : (settings.rootPaths ?? (settings.rootPath ? [settings.rootPath] : []))
+  if (rootPaths.length === 0) return { settings, repositories: [], telemetry: { entriesExamined: 0, maxDepth: 0, resultsEmitted: 0, terminationReason: 'completed', worktreesDiscovered: 0 } }
+  const allowedRoots = settings.allowedRoots ?? rootPaths
+  if (rootPaths.some(rootPath => !allowedRoots.some(allowedRoot => isWithinDirectory(rootPath, allowedRoot)))) throw new Error('Discovery root is outside the allowed roots')
+  const configured = getSourcesSafe({ refreshGitMetadata: false })
   const configuredByPath = new Map(configured.map(source => [canonicalConfiguredSourcePath(source.path), source]))
   const repositories: DiscoveredRepository[] = []
   const seen = new Set<string>()
@@ -635,10 +819,36 @@ export function discoverRepositories(rootPathInput?: string): { settings: Source
   let maxDepth = 0
   let terminationReason: SourceDiscoveryTelemetry['terminationReason'] = 'completed'
 
+  const isSubmodule = (current: string): boolean => Boolean(runGit(current, ['rev-parse', '--show-superproject-working-tree']))
+
+  const emitRepository = (resolved: string): void => {
+    if (seen.has(resolved) || repositories.length >= MAX_REPO_DISCOVERY_RESULTS || isSubmodule(resolved)) return
+    const existing = configuredByPath.get(resolved)
+    const gitMetadata = getGitSourceMetadata(resolved)
+    if (!gitMetadata.repoGroupId) return
+    if (namingPattern && !namingPattern.test(path.basename(resolved))) return
+    seen.add(resolved)
+    const relativePath = path.relative(rootPaths.find(root => isWithinDirectory(resolved, root)) || resolved, resolved) || path.basename(resolved)
+    const [account = 'Root'] = relativePath.split(path.sep)
+    repositories.push({
+      path: resolved,
+      label: prettifyRepoLabel(path.basename(resolved)),
+      id: existing?.id ?? generateDiscoveredSourceId(resolved),
+      account,
+      relativePath,
+      ...gitMetadata,
+      alreadyAdded: !!existing,
+      sourceId: existing?.id,
+      ...(existing ? { enabled: existing.enabled } : {}),
+      trustStatus: 'trusted'
+    })
+  }
+
   const walk = (current: string, depth: number) => {
-    maxDepth = Math.max(maxDepth, depth)
     if (depth > MAX_REPO_DISCOVERY_DEPTH || repositories.length >= MAX_REPO_DISCOVERY_RESULTS) return
-    if (isIgnoredDiscoveryPath(rootPath, current, settings.ignorePatterns ?? DEFAULT_REPO_DISCOVERY_IGNORE_PATTERNS)) return
+    maxDepth = Math.max(maxDepth, depth)
+    const scanRoot = rootPaths.find(root => isWithinDirectory(current, root)) || rootPaths[0]
+    if (isIgnoredDiscoveryPath(scanRoot, current, settings.ignorePatterns ?? DEFAULT_REPO_DISCOVERY_IGNORE_PATTERNS)) return
     let entries: fs.Dirent[] = []
     try {
       const directory = fs.opendirSync(current)
@@ -664,27 +874,7 @@ export function discoverRepositories(rootPathInput?: string): { settings: Source
     } catch { /* not a repository */ }
     if (gitEntry) {
       const resolved = fs.realpathSync(current)
-      if (namingPattern && !namingPattern.test(path.basename(resolved))) return
-      if (!seen.has(resolved)) {
-        seen.add(resolved)
-        const relativePath = path.relative(rootPath, resolved) || path.basename(resolved)
-        const [account = 'Root'] = relativePath.split(path.sep)
-        const existing = configuredByPath.get(resolved)
-        const gitMetadata = getGitSourceMetadata(resolved)
-        repositories.push({
-          path: resolved,
-          label: prettifyRepoLabel(path.basename(resolved)),
-          id: `${generateSourceIdFromPath(account)}-${generateSourceIdFromPath(resolved)}`,
-          account,
-          relativePath,
-          ...gitMetadata,
-          alreadyAdded: !!existing,
-          sourceId: existing?.id,
-          ...(existing ? { enabled: existing.enabled } : {}),
-          trustStatus: 'trusted'
-        })
-      }
-      return
+      emitRepository(resolved)
     }
     for (const entry of entries) {
       if (!entry.isDirectory() || entry.isSymbolicLink()) continue
@@ -692,12 +882,29 @@ export function discoverRepositories(rootPathInput?: string): { settings: Source
     }
   }
 
-  walk(rootPath, 0)
-  const nextSettings = setSourceDiscoverySettings({ rootPath, intervalMinutes: settings.intervalMinutes, lastScannedAt: new Date().toISOString() })
+  for (const rootPath of rootPaths) walk(expandTilde(rootPath), 0)
+  const worktreeCandidates = repositories.filter(repository => repository.repoRoot && repository.isGitWorktree !== true)
+  for (const repository of worktreeCandidates) {
+    const worktrees = runGit(repository.path, ['worktree', 'list', '--porcelain']) || ''
+    let currentPath: string | undefined
+    for (const line of worktrees.split('\n')) {
+      if (line.startsWith('worktree ')) currentPath = line.slice('worktree '.length).trim()
+      if (line === '' && currentPath) {
+        const resolved = canonicalConfiguredSourcePath(currentPath)
+        if (rootPaths.some(root => isWithinDirectory(resolved, root))) emitRepository(resolved)
+        currentPath = undefined
+      }
+    }
+    if (currentPath) {
+      const resolved = canonicalConfiguredSourcePath(currentPath)
+      if (rootPaths.some(root => isWithinDirectory(resolved, root))) emitRepository(resolved)
+    }
+  }
+  const nextSettings = setSourceDiscoverySettings({ rootPaths, allowedRoots: settings.allowedRoots, intervalMinutes: settings.intervalMinutes, lastScannedAt: new Date().toISOString(), allowMissingRoots: true })
   return {
     settings: nextSettings,
     repositories: repositories.sort((a, b) => `${a.account}/${a.label}`.localeCompare(`${b.account}/${b.label}`)),
-    telemetry: { entriesExamined, maxDepth, resultsEmitted: repositories.length, terminationReason: repositories.length >= MAX_REPO_DISCOVERY_RESULTS ? 'result_limit' : terminationReason }
+    telemetry: { entriesExamined, maxDepth, resultsEmitted: repositories.length, terminationReason: repositories.length >= MAX_REPO_DISCOVERY_RESULTS ? 'result_limit' : terminationReason, worktreesDiscovered: repositories.filter(repository => repository.isGitWorktree === true).length }
   }
 }
 
@@ -748,7 +955,9 @@ export function setActiveSourceContext(mode: ActiveSourcesMode, activeSourceIds:
   if (!config) throw new Error('Please run: buildflow init')
   const sources = getEnabledSources()
   const ids = new Set(sources.map(s => s.id))
-  const uniqueIds = Array.from(new Set(activeSourceIds.filter(id => typeof id === 'string' && id.length > 0)))
+  const uniqueIds = Array.from(new Set(activeSourceIds
+    .filter(id => typeof id === 'string' && id.length > 0)
+    .map(id => resolveConfiguredSourceId(id, sources))))
   const invalidIds = uniqueIds.filter(id => !ids.has(id))
   if (invalidIds.length > 0) {
     throw new Error(`Unknown or disabled sourceId(s): ${invalidIds.join(', ')}`)
@@ -935,11 +1144,23 @@ export function setSourceIndexStatus(
     indexError?: string
     indexFailureCode?: IndexScanFailureCode
     sourceRevision?: string
+    observedRevision?: string
+    sourceBranchName?: string
+    observedBranchName?: string
     sourcePathIdentity?: string
     sourceWorktreeIdentity?: string
+    observedWorktreeIdentity?: string
     indexPolicyVersion?: string
     indexExclusionVersion?: string
     indexPolicyIdentity?: string
+    indexSchemaVersion?: string
+    indexGeneration?: string
+    freshnessState?: SourceFreshnessState
+    refreshReason?: string
+    changedPathCount?: number
+    lastRefreshFailureAt?: string
+    retryCount?: number
+    retryAfterAt?: string
     discoveredAt?: string
     queuedAt?: string
     indexingAt?: string
@@ -955,8 +1176,23 @@ export function setSourceIndexStatus(
   upsertIndexState(sourceId, {
     ...record,
     ...(record.indexStatus === 'ready' ? { indexError: undefined, indexFailureCode: undefined } : {}),
-    ...(binding || {}),
-    ...(record.indexStatus === 'ready' && record.lastIndexedAt ? { sourceRevision: binding?.sourceRevision } : {})
+    ...(binding && record.indexStatus === 'ready' ? {
+      sourceRevision: binding.sourceRevision,
+      sourceBranchName: binding.sourceBranchName,
+      sourcePathIdentity: binding.sourcePathIdentity,
+      sourceWorktreeIdentity: binding.sourceWorktreeIdentity,
+      observedRevision: binding.sourceRevision,
+      observedBranchName: binding.sourceBranchName,
+      observedWorktreeIdentity: binding.sourceWorktreeIdentity,
+      indexSchemaVersion: binding.indexSchemaVersion,
+      indexGeneration: record.lastIndexedAt,
+      freshnessState: 'ready' as const
+    } : {}),
+    ...(binding && record.indexStatus === 'failed' ? {
+      observedRevision: binding.sourceRevision,
+      observedBranchName: binding.sourceBranchName,
+      observedWorktreeIdentity: binding.sourceWorktreeIdentity
+    } : {})
   })
 }
 
@@ -966,6 +1202,7 @@ export function markSourceIndexPending(sourceId: string): void {
     indexStatus: 'pending',
     indexedFileCount: 0,
     indexError: undefined,
+    freshnessState: 'preparing',
     queuedAt: new Date().toISOString()
   })
 }

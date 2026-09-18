@@ -25,7 +25,7 @@ services:
       # For dev/testing, set a test value; for production, use a strong secret
       RELAY_PROXY_TOKEN: ${RELAY_PROXY_TOKEN:-change-me-in-production}
     volumes:
-      # Preserve the existing relay state while the Compose project adopts the Workbench name.
+      # Preserve the existing relay state while this deployment uses the Mastermind product name.
       - workbench-data:/var/lib/buildflow
     restart: unless-stopped
     healthcheck:

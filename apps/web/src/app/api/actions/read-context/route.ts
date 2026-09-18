@@ -32,7 +32,7 @@ function withReadActivity(data: unknown, params: { mode: string; sourceId?: stri
   return {
     ...obj,
     activity: {
-      version: '1.2.13-beta',
+      version: '2.0.0-beta',
       operationId: 'readWorkbenchContext',
       phase: 'completed',
       actionLabel: 'Read focused repo context',

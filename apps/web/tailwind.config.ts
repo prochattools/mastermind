@@ -14,6 +14,22 @@ const config: Config = {
         mono: ['var(--font-mono)']
       },
       colors: {
+        mm: {
+          canvas: 'rgb(var(--canvas) / <alpha-value>)',
+          surface: 'rgb(var(--surface) / <alpha-value>)',
+          subtle: 'rgb(var(--surface-subtle) / <alpha-value>)',
+          raised: 'rgb(var(--surface-raised) / <alpha-value>)',
+          border: 'rgb(var(--border) / <alpha-value>)',
+          'border-strong': 'rgb(var(--border-strong) / <alpha-value>)',
+          text: 'rgb(var(--text) / <alpha-value>)',
+          muted: 'rgb(var(--text-muted) / <alpha-value>)',
+          'subtle-text': 'rgb(var(--text-subtle) / <alpha-value>)',
+          accent: 'rgb(var(--accent) / <alpha-value>)',
+          focus: 'rgb(var(--focus-ring) / <alpha-value>)',
+          success: 'rgb(var(--success) / <alpha-value>)',
+          warning: 'rgb(var(--warning) / <alpha-value>)',
+          danger: 'rgb(var(--danger) / <alpha-value>)'
+        },
         bf: {
           bg: 'rgb(var(--bf-bg) / <alpha-value>)',
           surface: 'rgb(var(--bf-surface) / <alpha-value>)',

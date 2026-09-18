@@ -65,8 +65,9 @@ export function resolveEnvVariable(
  * intentionally not wired into runtime configuration during Phase 3C.
  *
  * Precedence is deterministic: Mastermind, then Workbench, then BuildFlow,
- * then the supplied default. Empty strings are treated as unset, matching the
- * legacy resolver above. The optional environment parameter keeps migration
+ * then the supplied default. A defined-but-empty Mastermind value is rejected
+ * when a lower-precedence value exists so a cutover typo cannot silently select
+ * a legacy credential. The optional environment parameter keeps migration
  * behavior easy to test without mutating process.env.
  */
 export function resolveMastermindEnvValue(
@@ -76,10 +77,17 @@ export function resolveMastermindEnvValue(
   defaultValue?: string,
   environment: NodeJS.ProcessEnv = process.env
 ): string | undefined {
+  const hasMastermind = Object.prototype.hasOwnProperty.call(environment, mastermind)
+  const mastermindValue = environment[mastermind]
+  const workbenchValue = environment[workbench]
+  const buildflowValue = buildflow ? environment[buildflow] : undefined
+  if (hasMastermind && !mastermindValue && (workbenchValue || buildflowValue)) {
+    throw new Error(`Conflicting environment variables: ${mastermind} is defined but empty while a legacy value is set.`)
+  }
   return (
-    environment[mastermind] ||
-    environment[workbench] ||
-    (buildflow ? environment[buildflow] : undefined) ||
+    mastermindValue ||
+    workbenchValue ||
+    buildflowValue ||
     defaultValue
   )
 }

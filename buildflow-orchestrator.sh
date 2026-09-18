@@ -9,5 +9,5 @@ if [ ! -x "$TARGET" ]; then
   exit 1
 fi
 
-echo "buildflow-orchestrator.sh is a compatibility wrapper. Delegating to ProChat Workbench local stack."
+echo "buildflow-orchestrator.sh is a legacy compatibility wrapper. Delegating to the Mastermind local stack."
 exec bash "$TARGET" "${1:-restart}"

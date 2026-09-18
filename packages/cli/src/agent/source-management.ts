@@ -4,7 +4,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import os from 'node:os'
 import { getConfigPath, expandTilde } from '../utils/paths'
-import { getSourceIndexBinding, loadConfig, saveConfig, withSourceDefaults, withSourceIndexState, generateSourceIdFromPath, clearGitMetadataCache, setSourceIndexStatus, isSourcePathAvailable, type AgentConfig } from './config'
+import { getSourceDiscoverySettings, getSourceIndexBinding, loadConfig, saveConfig, withSourceDefaults, withSourceIndexState, generateSourceIdFromPath, clearGitMetadataCache, setSourceIndexStatus, isSourcePathAvailable, type AgentConfig } from './config'
 import { getIndexRecord, upsertIndexState } from './index-state'
 import { IndexScanError, Indexer } from './indexer'
 import { INDEX_SCAN_EXCLUSION_VERSION, INDEX_SCAN_POLICY_ID, INDEX_SCAN_POLICY_VERSION } from './index-scan-policy'
@@ -31,11 +31,12 @@ export type SourceDetails = KnowledgeSource & {
   managedWorktreeDir: string | undefined
 }
 
+export type AddRepositoryOptions = { automatic?: boolean }
 export type AddRepositoryResult = { sources: SourceDetails[] }
 export type RemoveSourceResult = { sources: SourceDetails[] }
 export type SetSourceEnabledResult = { sources: SourceDetails[] }
 export type ReindexSourceResult = { source: SourceDetails; status: 'indexing' | 'ready' | 'failed' }
-export type RefreshSourceMetadataResult = { source: SourceDetails }
+export type RefreshSourceMetadataResult = { source: SourceDetails; metadataChanged?: boolean }
 export type AddBranchSourceResult = { sources: SourceDetails[] }
 export type RemoveBranchSourceResult = {
   sources: SourceDetails[]
@@ -340,7 +341,7 @@ export function listSourceDetails(): SourceDetails[] {
 // Phase 2: add repository (hardened with atomic write and rollback)
 // ---------------------------------------------------------------------------
 
-export function addRepository(inputPath: string, label?: string, id?: string): AddRepositoryResult {
+export function addRepository(inputPath: string, label?: string, id?: string, options: AddRepositoryOptions = {}): AddRepositoryResult {
   rejectPathTraversal(inputPath)
   const config = loadConfigRequired()
   const expanded = expandTilde(inputPath)
@@ -366,7 +367,8 @@ export function addRepository(inputPath: string, label?: string, id?: string): A
     repoRoot: meta.repoRoot,
     branchName: meta.branchName,
     availableBranches: meta.availableBranches,
-    isGitWorktree: meta.isGitWorktree
+    isGitWorktree: meta.isGitWorktree,
+    ...(options.automatic ? { autoIndexEnabled: true, autoIndexIntervalMinutes: 5 } : {})
   } as KnowledgeSource)
 
   const backupSources = config.sources ? [...config.sources] : undefined
@@ -440,6 +442,24 @@ export function setSourceEnabledSafe(sourceId: string, enabled: boolean): SetSou
     : { indexed: false, indexStatus: 'disabled', indexError: undefined })
   if (enabled) startSourceReindex(sourceId)
   return { sources: listSourceDetails() }
+}
+
+/** Persist non-destructive discovery state without changing enablement or source identity. */
+export function setSourceAvailability(sourceId: string, status: NonNullable<KnowledgeSource['availabilityStatus']> | undefined, reason?: string): void {
+  const config = loadConfigRequired()
+  const sources = getCurrentSources(config)
+  if (!sources.some(source => source.id === sourceId)) throw new SourceManagementError('not_found', `Source not found: ${sourceId}`)
+  const backupSources = config.sources ? [...config.sources] : undefined
+  try {
+    config.sources = sources.map(source => source.id === sourceId
+      ? { ...source, ...(status ? { availabilityStatus: status } : { availabilityStatus: undefined }), ...(reason ? { availabilityReason: reason } : { availabilityReason: undefined }) }
+      : source)
+    atomicSaveConfig(config)
+  } catch (err) {
+    config.sources = backupSources
+    if (err instanceof SourceManagementError) throw err
+    throw new SourceManagementError('write_failed', `Failed to save discovery state: ${err instanceof Error ? err.message : String(err)}`)
+  }
 }
 
 /**
@@ -572,11 +592,53 @@ export function startPendingSourceReindexes(): void {
   })()
 }
 
+/**
+ * Reconcile automatically managed sources with their durable index state.
+ * The portable host does not run the CLI HTTP server, so it needs its own
+ * bounded sweep to catch Git HEAD and worktree changes after startup.
+ */
+export function sweepAutomaticSourceReindexes(): void {
+  const config = loadConfig()
+  if (!config) return
+  const discoverySettings = getSourceDiscoverySettings()
+  const configuredRoots = discoverySettings.rootPaths ?? (discoverySettings.rootPath ? [discoverySettings.rootPath] : [])
+  const discoveryRoots = configuredRoots.map(resolveCanonical)
+  const isInDiscoveryRoot = (sourcePath: string): boolean => {
+    const canonical = resolveCanonical(sourcePath)
+    return discoveryRoots.some(root => {
+      const relative = path.relative(root, canonical)
+      return relative === '' || (relative !== '..' && !relative.startsWith(`..${path.sep}`) && !path.isAbsolute(relative))
+    })
+  }
+
+  for (const source of getCurrentSources(config)) {
+    if (!source.enabled || activeReindexes.has(source.id) || (source.autoIndexEnabled !== true && !isInDiscoveryRoot(source.path))) continue
+    if (!isSourcePathAvailable(source.path)) continue
+
+    const record = getIndexRecord(source.id)
+    const binding = getSourceIndexBinding(source.id)
+    if (!binding) continue
+
+    const needsRefresh = !record
+      || record.indexStatus !== 'ready'
+      || record.indexed !== true
+      || record.sourceRevision !== binding.sourceRevision
+      || record.sourcePathIdentity !== binding.sourcePathIdentity
+      || record.sourceWorktreeIdentity !== binding.sourceWorktreeIdentity
+      || record.indexPolicyVersion !== INDEX_SCAN_POLICY_VERSION
+      || record.indexExclusionVersion !== INDEX_SCAN_EXCLUSION_VERSION
+      || record.indexPolicyIdentity !== INDEX_SCAN_POLICY_ID
+
+    if (!needsRefresh) continue
+    try { startSourceReindex(source.id) } catch { /* durable state records the next observable failure */ }
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Phase 2: refresh source metadata
 // ---------------------------------------------------------------------------
 
-export function refreshSourceMetadata(sourceId: string): RefreshSourceMetadataResult {
+export function refreshSourceMetadata(sourceId: string, options: { startReindex?: boolean } = {}): RefreshSourceMetadataResult {
   const config = loadConfigRequired()
   const sources = getCurrentSources(config)
   const target = sources.find(s => s.id === sourceId)
@@ -587,7 +649,11 @@ export function refreshSourceMetadata(sourceId: string): RefreshSourceMetadataRe
   let meta: Partial<GitRepMeta> = {}
   try { meta = requireGitRepo(target.path) } catch { /* non-git source — keep existing metadata */ }
   const metadataChanged = Object.keys(meta).length > 0 && (
-    target.repoGroupId !== meta.repoGroupId || target.repoRoot !== meta.repoRoot || target.branchName !== meta.branchName
+    target.repoGroupId !== meta.repoGroupId
+    || target.repoRoot !== meta.repoRoot
+    || target.branchName !== meta.branchName
+    || target.isGitWorktree !== meta.isGitWorktree
+    || JSON.stringify(target.availableBranches || []) !== JSON.stringify(meta.availableBranches || [])
   )
 
   const backupSources = config.sources ? [...config.sources] : undefined
@@ -601,9 +667,9 @@ export function refreshSourceMetadata(sourceId: string): RefreshSourceMetadataRe
   }
 
   const updated = listSourceDetails().find(s => s.id === sourceId)
-  if (metadataChanged && updated?.enabled) startSourceReindex(sourceId)
+  if (metadataChanged && updated?.enabled && options.startReindex !== false) startSourceReindex(sourceId)
   if (!updated) throw new SourceManagementError('internal', `Source disappeared after refresh: ${sourceId}`)
-  return { source: updated }
+  return { source: updated, metadataChanged }
 }
 
 // ---------------------------------------------------------------------------

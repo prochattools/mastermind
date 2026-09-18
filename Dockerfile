@@ -1,4 +1,4 @@
-# Multi-stage build for BuildFlow production topology
+# Multi-stage build for the Mastermind production topology
 # Builds relay, web, and proxy in separate stages; runs all three in production container
 
 # Build stage 1: relay

@@ -5,12 +5,13 @@ is the current product identity; Workbench and BuildFlow are compatibility
 identifiers only.
 
 The canonical action endpoint is `https://mastermind.prochat.tools`.
-`https://workbench.prochat.tools` is a compatibility endpoint for existing
-configurations.
+The former `https://workbench.prochat.tools` public hostname is retired; old
+Workbench identifiers remain logical compatibility aliases in the service.
 
 ## Included
 
-- local dashboard, CLI, and native macOS application
+- menu-bar-first native macOS companion, with advanced local dashboard and CLI
+  fallback surfaces
 - user-owned repositories, folders, and knowledge sources
 - source registration, indexing, search, and health diagnostics
 - explicit source locking for Custom GPT Actions

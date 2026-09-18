@@ -2,7 +2,7 @@ import crypto from 'node:crypto'
 import { execFileSync } from 'node:child_process'
 import fs from 'node:fs'
 import path from 'node:path'
-import { getSourcesSafe, getWriteMode, isSourcePathAvailable, loadConfig } from './config'
+import { getSourcesSafe, getWriteMode, isSourcePathAvailable, loadConfig, resolveConfiguredSourceId } from './config'
 import type { AutonomyDecisionEvidenceReference } from '@mastermind/shared'
 import { buildWriteConfirmationToken, hasValidWriteConfirmation, normalizeRepoRelativePath, validateWriteTarget, type WriteChangeType } from './safe-access'
 import { getAllowedCommandKinds, runSafeCommand, type SafeCommandRequest, type SafeCommandResult } from './command-runner'
@@ -10,11 +10,11 @@ import { classifyParsedRunCommandRequest, parseRunCommandRouteRequest, toSafeCom
 import { executeWithWorkbenchAdmission, type WorkbenchAdmissionOptions } from './workbench-admission-orchestrator'
 import { cancelWorkbenchValidationJob, compactWorkbenchValidationJobForPublic, getWorkbenchValidationJob, getWorkbenchValidationJobResultPage, scheduleWorkbenchValidationJob, submitWorkbenchValidationJob } from './workbench-validation-jobs'
 import { runControlledWorkflowMigrationCommand, type MigrationCommandAdapterDependencies } from './n8n-workflow-migration-command-adapter'
-import { createWorkbenchRun, ensureWorkbenchActionRun, getActiveWorkbenchRun, getAgentJob, resumeWorkbenchRun, updateAgentJob, type WorkbenchGoalContext } from './agent-jobs'
+import { blockBoundedWorkbenchActionRun, createWorkbenchRun, ensureWorkbenchActionRun, finalizeBoundedWorkbenchActionRun, getActiveWorkbenchRun, getAgentJob, resumeWorkbenchRun, updateAgentJob, type WorkbenchGoalContext } from './agent-jobs'
 import type { CodexDelegationAdapter } from './external-delegation-adapter'
 import { dispatchWorkbenchGoal, getWorkbenchGoalTerminalResult, type WorkbenchGoalDispatchInput } from './workbench-goal-dispatch'
 import { appendAgentEvent, findOpenApprovalActivity } from './agent-events'
-import { getWorkbenchSession, type WorkbenchSessionStoreOptions } from './workbench-session-store'
+import { getWorkbenchSession, type WorkbenchSessionRecord, type WorkbenchSessionStoreOptions } from './workbench-session-store'
 import { authorizeWorkbenchValidationJobRead, readAuthorizedWorkbenchEvidence } from './workbench-evidence-retrieval'
 import { closeWorkbenchRun } from './workbench-run-close'
 import { projectPortableActiveRunActivity } from './portable-read-handlers'
@@ -31,7 +31,8 @@ import { attachWorkbenchEvidence, type WorkbenchEvidenceAttachment, type Workben
 import { prepareAutonomyDecisionAuthorization, type AutonomyDecisionAuthorization } from './autonomy-decision-authorization'
 import type { PortableOperationHandlers, PortableExecutionContext } from '../../../../apps/web/src/lib/actions/portable-operation-dispatcher'
 import { PortableOperationError } from './portable-operation-errors'
-import { authorizeContextOperation } from './context-broker'
+import { authorizeContextOperation, prepareAuthorizedContext } from './context-broker'
+import { evaluateFreshnessPolicy } from './freshness-policy-engine'
 import { workbenchSessionIdForRun } from './workbench-run-session'
 import { continuationHintPaths, mergeFollowUpPaths, normalizeFollowUpContext, type WorkbenchContinuationContext } from './workbench-follow-up-context'
 import { routeAdaptiveExecution } from './adaptive-execution-router'
@@ -62,10 +63,13 @@ function sourceFor(body: Payload, context: PortableExecutionContext): string {
   const payloadSourceId = typeof body.sourceId === 'string'
     ? body.sourceId
     : typeof nestedCommand?.sourceId === 'string' ? nestedCommand.sourceId : undefined
-  if (context.sourceId && payloadSourceId && context.sourceId !== payloadSourceId) {
+  const configured = getSourcesSafe({ refreshGitMetadata: false, includeIndexState: false })
+  const contextSourceId = context.sourceId ? resolveConfiguredSourceId(context.sourceId, configured) : undefined
+  const resolvedPayloadSourceId = payloadSourceId ? resolveConfiguredSourceId(payloadSourceId, configured) : undefined
+  if (contextSourceId && resolvedPayloadSourceId && contextSourceId !== resolvedPayloadSourceId) {
     throw new PortableOperationError('source_mismatch', 'The payload sourceId does not match the canonical request sourceId.')
   }
-  const sourceId = context.sourceId || payloadSourceId
+  const sourceId = contextSourceId || resolvedPayloadSourceId
   if (!sourceId) throw new PortableOperationError('invalid_request', 'sourceId is required.')
   return sourceId
 }
@@ -82,7 +86,8 @@ function sessionFor(body: Payload, context: PortableExecutionContext): string {
 
 function requireEnabledSource(sourceId: string, sources?: ReturnType<typeof getSourcesSafe>): { id: string; path: string } {
   const configuredSources = sources || getSourcesSafe({ refreshGitMetadata: false })
-  const source = configuredSources.find(item => item.id === sourceId && item.enabled && (sources ? true : isSourcePathAvailable(item.path)))
+  const resolvedSourceId = resolveConfiguredSourceId(sourceId, configuredSources)
+  const source = configuredSources.find(item => item.id === resolvedSourceId && item.enabled && (sources ? true : isSourcePathAvailable(item.path)))
   if (!source) throw new PortableOperationError('source_mismatch', `Source not found or unavailable: ${sourceId}`)
   return source
 }
@@ -95,7 +100,17 @@ function contextSessionId(body: Payload): string | undefined {
 
 function requireBrokerMutationAuthorization(body: Payload, sourceId: string, operation: 'mutation' | 'command'): Record<string, unknown> | undefined {
   const sessionId = contextSessionId(body)
-  if (!sessionId) return undefined
+  if (!sessionId) {
+    const prepared = prepareAuthorizedContext(sourceId, 'explicit-source-id')
+    if (!prepared.ok) throw new PortableOperationError('policy_rejected', 'message' in prepared ? prepared.message : 'Repository context could not be prepared.')
+    // A dry-run/preflight validates the exact path and authorization but does
+    // not mutate the repository, so stale context is a warning rather than a
+    // mutation block. The no-write branch still runs after this admission.
+    const policyOperation = operation === 'mutation' && (body.dryRun === true || body.preflight === true) ? 'read' : operation
+    const policy = evaluateFreshnessPolicy({ health: prepared.health, operation: policyOperation }, {})
+    if (policy.decision === 'block') throw new PortableOperationError('policy_rejected', policy.blockReason || 'Freshness policy blocked the mutation.', { details: policy })
+    return { ...prepared.metadata, freshnessPolicy: policy }
+  }
   const result = authorizeContextOperation(sourceId, operation, sessionId, body.confirmedByUser === true, {
     storeOptions: undefined
   })
@@ -111,6 +126,13 @@ function resolveActivityRun(sourceId: string, context: PortableExecutionContext)
     if (!session || 'ok' in session || session.activeRunId !== activeRun.id || !session.lockedSourceIds.includes(sourceId)) return undefined
   }
   return { id: activeRun.id }
+}
+
+function sessionOwnsSource(session: WorkbenchSessionRecord, sourceId: string, configuredSources: ReturnType<typeof getSourcesSafe>): boolean {
+  return session.lockedSourceIds.some(lockedSourceId => {
+    if (lockedSourceId === sourceId) return true
+    try { return resolveConfiguredSourceId(lockedSourceId, configuredSources) === sourceId } catch { return false }
+  })
 }
 
 function fileActivityPaths(changeType: string, body: Record<string, unknown>): string[] {
@@ -675,13 +697,24 @@ export function executeWorkbenchFileChangeMutation(body: Payload, context: Porta
         requestId: context.requestId
       })
     : undefined
-  const contextMetadata = requireBrokerMutationAuthorization(body, sourceId, 'mutation')
-  const result = executeWorkbenchFileChangeMutationInternal(body, context)
+  let contextMetadata: Record<string, unknown> | undefined
+  let result: RouteResult
+  try {
+    contextMetadata = requireBrokerMutationAuthorization(body, sourceId, 'mutation')
+    result = executeWorkbenchFileChangeMutationInternal(body, context)
+  } catch (error) {
+    if (actionRun?.created) {
+      const reason = error instanceof PortableOperationError ? error.code : 'file_change_failed'
+      blockBoundedWorkbenchActionRun(actionRun.runId, reason, 'File operation was blocked before mutation.')
+    }
+    throw error
+  }
   if (actionRun && result.statusCode >= 400 && !context.suppressFileApprovalActivity) {
     const blocked = result.body.status === 'needs_confirmation' || result.body.code === 'REQUIRES_EXPLICIT_CONFIRMATION'
     const requirement = blocked ? fileApprovalRequirement(changeType, result) : undefined
     updateAgentJob(actionRun.runId, {
       status: blocked ? 'needs_confirmation' : 'blocked',
+      ...(blocked ? {} : { blockedDisposition: 'historical' as const }),
       blockedReason: blocked ? 'confirmation_required' : 'file_change_blocked',
       summary: blocked ? 'The file change is waiting for explicit confirmation.' : 'The file change was blocked before any filesystem mutation.'
     })
@@ -716,6 +749,12 @@ export function executeWorkbenchFileChangeMutation(body: Payload, context: Porta
         status: 'completed'
       })
     }
+    if (actionRun.created) {
+      finalizeBoundedWorkbenchActionRun(actionRun.runId, 'Bounded file operation completed with verified repository evidence.')
+    }
+  }
+  if (actionRun?.created && result.statusCode === 200 && (result.body.dryRun === true || result.body.preflight === true)) {
+    finalizeBoundedWorkbenchActionRun(actionRun.runId, 'Bounded file-operation preflight completed without changing the repository.')
   }
   const bodyWithRun = actionRun ? { ...result.body, workbenchRun: actionRun } : result.body
   return contextMetadata || actionRun ? { ...result, body: { ...bodyWithRun, ...(contextMetadata ? { contextMetadata } : {}) } } : result
@@ -739,9 +778,16 @@ export async function executeWorkbenchCommandMutation(body: Payload, context: Po
   if (routed.ok === false) return { statusCode: 400, body: { error: routed.error } }
   if (requireSession && routed.mode !== 'session_aware') return { statusCode: 400, body: { error: 'version 2 session-aware command envelope is required' } }
   if (routed.mode === 'session_aware' && sessionId && routed.sessionId !== sessionId) return { statusCode: 400, body: { error: { code: 'SESSION_SOURCE_MISMATCH', message: 'sessionId does not match the canonical request sessionId.' } } }
-  const parsed = routed.command
-  if (parsed.sourceId !== sourceId) return { statusCode: 400, body: { error: { code: 'SESSION_SOURCE_MISMATCH', message: 'sourceId does not match the canonical request sourceId.' } } }
   const configuredSources = options.getSources ? options.getSources() : getSourcesSafe({ refreshGitMetadata: false })
+  const parsedSourceId = resolveConfiguredSourceId(routed.command.sourceId, configuredSources)
+  if (parsedSourceId !== sourceId) return { statusCode: 400, body: { error: { code: 'SESSION_SOURCE_MISMATCH', message: 'sourceId does not match the canonical request sourceId.' } } }
+  const parsed = {
+    ...routed.command,
+    sourceId,
+    ...('request' in routed.command && routed.command.request
+      ? { request: { ...routed.command.request, sourceId } }
+      : {})
+  } as typeof routed.command
   const source = requireEnabledSource(sourceId, configuredSources)
   const contextMetadata = requireBrokerMutationAuthorization(body, sourceId, 'command')
   const attachCommandMetadata = (result: RouteResult): RouteResult => contextMetadata
@@ -750,7 +796,7 @@ export async function executeWorkbenchCommandMutation(body: Payload, context: Po
   const sessionOptions = options.session || options.admission?.session
   const commandSession = routed.mode === 'session_aware' ? getWorkbenchSession(routed.sessionId, sessionOptions) : undefined
   const activityRun = routed.mode === 'session_aware'
-    ? commandSession && !('ok' in commandSession) && commandSession.lockedSourceIds.includes(sourceId) && typeof commandSession.activeRunId === 'string'
+    ? commandSession && !('ok' in commandSession) && sessionOwnsSource(commandSession, sourceId, configuredSources) && typeof commandSession.activeRunId === 'string'
       ? { id: commandSession.activeRunId }
       : undefined
     : resolveActivityRun(sourceId, context)
@@ -1047,6 +1093,9 @@ async function apply(body: Payload, context: PortableExecutionContext, options: 
       if (run && (hasConfirmationAttempt(body) || decisionAuthorization.status === 'allowed') && paths.length > 0) {
         projectApprovalResolved(run.id, sourceId, operation, paths, context.requestId)
       }
+    }
+    if (result.statusCode === 200 && (result.body.verified === true || result.body.dryRun === true || result.body.preflight === true) && actionRun.created) {
+      finalizeBoundedWorkbenchActionRun(actionRun.runId, 'Bounded file operation completed with verified repository evidence.')
     }
     // The composition boundary owns run creation. The inner helper reuses the
     // same run and therefore reports created:false; preserve the authoritative

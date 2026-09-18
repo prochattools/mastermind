@@ -117,7 +117,8 @@ function candidatesFor(sources: KnowledgeSource[]): ResumeWorkspaceCandidate[] {
 }
 
 function isActiveRun(run: ResumeActiveRun): boolean {
-  return ['queued', 'running', 'needs_confirmation', 'blocked'].includes(run.status)
+  if (['queued', 'running', 'needs_confirmation'].includes(run.status)) return true
+  return (run.status === 'blocked' || run.status === 'paused') && run.resumable === true
 }
 
 export function resolveResumeNavigation(params: {

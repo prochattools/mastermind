@@ -3,9 +3,9 @@ import path from 'node:path'
 import { getActiveWorkbenchRun, listActiveWorkbenchRuns, listAgentJobs } from './agent-jobs'
 import { getWorkbenchGoalTerminalResult } from './workbench-goal-dispatch'
 import { appendAgentEvent, listWorkbenchActivity } from './agent-events'
-import { ensureWorkbenchActionRun, type WorkbenchActionRunBinding, updateAgentJob } from './agent-jobs'
+import { ensureWorkbenchActionRun, finalizeBoundedWorkbenchActionRun, type WorkbenchActionRunBinding, updateAgentJob } from './agent-jobs'
 import { listWorkbenchPacketRecords } from './workbench-packet-store'
-import { getActiveSourceContext, getSourceIndexState, getSourcesSafe, isSourcePathAvailable } from './config'
+import { getActiveSourceContext, getSourceIndexState, getSourcesSafe, isSourcePathAvailable, resolveConfiguredSourceId } from './config'
 import { handleFocusedRead } from './focused-read'
 import { handleGraphContextRouted } from './graph-context-router'
 import { DEFAULT_IGNORE_PATTERNS, Indexer, MAX_INDEXABLE_FILE_BYTES, boundedSourceScan, getIndexedDocumentCountFromDisk } from './indexer'
@@ -38,6 +38,7 @@ export type PortableReadHandlerDependencies = {
   indexedFiles?: () => number
   indexingActive?: () => boolean
   indexingSourceIds?: () => string[]
+  freshnessSummary?: () => Record<string, unknown>
   readResponseBudgetBytes?: number
   readMaxBytesPerFile?: number
   searcher?: (sourceIds?: string[]) => VaultSearcher
@@ -129,11 +130,12 @@ function asString(value: unknown): string | undefined {
 }
 
 function sourceIds(payload: Payload, context?: PortableExecutionContext): string[] {
-  if (context?.sourceId) return [context.sourceId]
+  const configured = getSourcesSafe({ refreshGitMetadata: false, includeIndexState: false })
+  if (context?.sourceId) return [resolveConfiguredSourceId(context.sourceId, configured)]
   const many = Array.isArray(payload.sourceIds) ? payload.sourceIds.filter((value): value is string => typeof value === 'string' && value.trim().length > 0) : []
-  if (many.length) return many
+  if (many.length) return many.map(sourceId => resolveConfiguredSourceId(sourceId, configured))
   const one = asString(payload.sourceId)
-  return one ? [one] : getActiveSourceContext().activeSourceIds
+  return one ? [resolveConfiguredSourceId(one, configured)] : getActiveSourceContext().activeSourceIds
 }
 
 function bounded(value: unknown, fallback: number, min: number, max: number): number {
@@ -167,8 +169,10 @@ export function compactStatusRun(value: unknown): Record<string, unknown> | unde
     ...(typeof run.runId === 'string' ? { runId: run.runId } : {}),
     ...(typeof run.sessionId === 'string' ? { sessionId: run.sessionId } : {}),
     ...(typeof run.sourceId === 'string' ? { sourceId: run.sourceId } : {}),
+    ...(typeof run.goal === 'string' ? { goal: run.goal.slice(0, 320) } : {}),
     ...(typeof run.workspace === 'string' ? { workspace: run.workspace.slice(0, 180) } : {}),
     ...(typeof run.status === 'string' ? { status: run.status } : {}),
+    ...(run.resumable === true ? { resumable: true } : {}),
     ...(typeof run.currentPosition === 'string' ? { currentPosition: run.currentPosition.slice(0, 240) } : {}),
     ...(typeof run.summary === 'string' ? { summary: run.summary.slice(0, 320) } : {}),
     ...(Array.isArray(run.nextActions) ? { nextActions: run.nextActions.filter(item => typeof item === 'string').slice(0, 3) } : {}),
@@ -271,14 +275,19 @@ function projectResponseCompleted(binding: WorkbenchActionRunBinding, context?: 
     requestId: context?.requestId,
     status: 'completed'
   })
+  if (binding.created) {
+    finalizeBoundedWorkbenchActionRun(binding.runId, recovered
+      ? 'Bounded repository result recovered with persisted evidence.'
+      : 'Bounded repository operation completed with persisted evidence.')
+  }
 }
 
 function fail(code: 'invalid_request' | 'source_mismatch' | 'dependency_unavailable', message: string): never {
   throw new PortableOperationError(code, message)
 }
 
-export function isSourceSearchReady(state: { indexStatus?: string } | null | undefined): boolean {
-  return state?.indexStatus === 'ready'
+export function isSourceSearchReady(state: { indexStatus?: string; indexed?: boolean; freshnessState?: string } | null | undefined): boolean {
+  return state?.indexStatus === 'ready' && state.indexed !== false && state.freshnessState !== 'stale' && state.freshnessState !== 'refreshing'
 }
 
 function requestSearchRecovery(sourceIds: string[], dependencies: PortableReadHandlerDependencies = {}): void {
@@ -631,12 +640,13 @@ export function createPortableReadHandlers(dependencies: PortableReadHandlerDepe
     },
     getWorkbenchStatus: payload => {
       const include = asString((payload as Payload).include)
-      // The native macOS client asks for the private `native` projection. It
+      // The native macOS client asks for the private `native_all` projection. It
       // needs the complete source records to hydrate KnowledgeSource values;
       // the public `sources` projection remains compact for GPT/UI payload
       // budgets and must not leak repository paths or index metadata.
-      const nativeSources = include === 'native'
+      const nativeSources = include === 'native' || include === 'native_all'
       const fullSources = nativeSources || include === 'sources' || include === 'all'
+      const includeActive = include === 'active' || include === 'all' || include === 'native_all'
       const sources = getSourcesSafe(fullSources ? {} : { refreshGitMetadata: false, includeIndexState: false })
       const active = getActiveSourceContext(fullSources ? {} : { refreshGitMetadata: false, includeIndexState: false })
       const focusedWorkspace = getFocusedWorkspace()
@@ -657,14 +667,15 @@ export function createPortableReadHandlers(dependencies: PortableReadHandlerDepe
         indexedFiles: dependencies.indexedFiles ? dependencies.indexedFiles() : getIndexedDocumentCountFromDisk(),
         ...(dependencies.indexingActive ? { indexingActive: dependencies.indexingActive() } : {}),
         ...(dependencies.indexingSourceIds ? { indexingSourceIds: dependencies.indexingSourceIds() } : {}),
+        ...(dependencies.freshnessSummary ? { freshness: dependencies.freshnessSummary() } : {}),
         ...(dependencies.maintenanceSnapshot ? { maintenance: dependencies.maintenanceSnapshot() } : {}),
         ...(fullSources ? { sources } : {}),
-        ...(include === 'active' || include === 'all' ? {
+        ...(includeActive ? {
           activeSourceIds: active.activeSourceIds,
           contextMode: active.mode,
           resume,
           ...(focusedWorkspaceProjection ? { focusedWorkspace: focusedWorkspaceProjection } : {}),
-          activeRuns: resume.status === 'ACTIVE_RUN' || resume.status === 'BLOCKED_RUN' ? [resume.activeRun] : []
+          activeRuns: activeRuns.slice(0, 5)
         } : {})
       }, { preserveSources: nativeSources })
     },

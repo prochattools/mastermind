@@ -9,6 +9,7 @@ import crypto from 'crypto'
  */
 export const INDEX_SCAN_POLICY_VERSION = 'source-index-v2'
 export const INDEX_SCAN_EXCLUSION_VERSION = 'source-exclusions-v3'
+export const INDEX_SCHEMA_VERSION = 'per-source-json-v3'
 
 // The deepest legitimate current Workbench path is depth 9. One segment of
 // headroom covers the next normal route/module nesting without making the

@@ -12,8 +12,8 @@ repeating mutations when a status or evidence lookup can reconcile the state.
 4. Open `/health` and `/api/openapi` from the endpoint.
 5. Re-import the current schema after an operation contract change.
 
-The compatibility hostname `https://workbench.prochat.tools` may still serve
-existing configurations, but it is not the endpoint for new setup.
+The former compatibility hostname `https://workbench.prochat.tools` is retired.
+Re-import the schema with the canonical Mastermind server URL instead.
 
 ## No source is available
 

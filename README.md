@@ -10,7 +10,7 @@ Mastermind is developed by ProChat. The product name is **Mastermind**.
 Workbench and BuildFlow appear only as historical or technical compatibility
 identifiers.
 
-> Current beta: `1.3.25-beta`
+> Current beta: `2.0.0-beta`
 
 ## Why Mastermind exists
 
@@ -46,7 +46,8 @@ small, guarded contract.
   supports them.
 - Creates explicit, scoped Git commits after validation and approval.
 - Persists run, checkpoint, activity, and resume state for larger goals.
-- Provides a native macOS application and a dashboard/CLI fallback path.
+- Provides a menu-bar-first native macOS companion for passive status and
+  recovery, with the dashboard and CLI retained as advanced/support paths.
 
 Mastermind is local-first, not local-only: the reasoning client may be remote,
 but the selected source and the execution boundary remain under the user's
@@ -70,8 +71,9 @@ The canonical endpoint is:
 https://mastermind.prochat.tools
 ```
 
-`https://workbench.prochat.tools` is a compatibility endpoint for existing
-configurations. New integrations should use the Mastermind endpoint.
+The former `workbench.prochat.tools` public hostname has been retired. Existing
+Workbench source, token, and session identifiers remain logical compatibility
+aliases, but public integrations must use the Mastermind endpoint.
 
 Every repository action requires an exact enabled `sourceId`. A dashboard's
 active source is a convenience for local UI, not implicit permission for a
@@ -159,8 +161,8 @@ by default.
 
 ## Native macOS application
 
-The repository includes a first-party native macOS application for the local
-fast path. The app and its owner-local helper share the same Mastermind goal,
+The repository includes a first-party menu-bar-first native macOS companion for
+local supervision and recovery. The app and its owner-local helper share the same Mastermind goal,
 source, policy, and validation model as the Custom GPT path; the app is not a
 second execution engine.
 
@@ -169,9 +171,13 @@ settings and status surfaces report helper, portable host, source, and ingress
 health. The repository also provides `mastermindctl` lifecycle commands for
 status, doctor, restart, upgrade, and rollback.
 
-The native GUI is currently a macOS surface. Other platforms can use the local
-dashboard, CLI, or the public action contract where their runtime is
-configured.
+The native GUI is currently a macOS surface and the normal local companion.
+Its advanced workspace remains available for diagnostics and source
+administration while discovery and indexing happen automatically. Users
+normally initiate work in ChatGPT rather than creating local Goals, typing a
+local prompt, manually activating repositories, or manually indexing them.
+Other platforms can use the local dashboard, CLI, or the public action
+contract where their runtime is configured.
 
 ## Installation and first run
 
@@ -186,7 +192,7 @@ pnpm --dir packages/cli build
 pnpm --dir packages/cli type-check
 ```
 
-For the local dashboard/runtime path:
+For the advanced local dashboard/runtime path:
 
 ```bash
 pnpm local:start

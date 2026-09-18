@@ -211,9 +211,13 @@ function resolveMastermindEnvValue(
   buildflow: string | undefined,
   defaultValue?: string
 ): string | undefined {
+  const hasMastermind = Object.prototype.hasOwnProperty.call(process.env, mastermind)
   const mastermindValue = process.env[mastermind]
   const workbenchValue = process.env[workbench]
   const buildflowValue = buildflow ? process.env[buildflow] : undefined
+  if (hasMastermind && !mastermindValue && (workbenchValue || buildflowValue)) {
+    throw new Error(`Conflicting environment variables: ${mastermind} is defined but empty while a legacy value is set.`)
+  }
   if (!mastermindValue && workbenchValue && buildflowValue && workbenchValue !== buildflowValue) {
     throw new Error(`Conflicting environment variables: ${workbench} and ${buildflow} are both set with different values. Remove the legacy ${buildflow}.`)
   }

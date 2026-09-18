@@ -1,22 +1,22 @@
-# BuildFlow Design System
+# Mastermind Design System
 
 ## Status
 
-Canonical design source of truth for BuildFlow Local dashboard and product UI.
+Canonical design source of truth for the Mastermind Local dashboard and product UI.
 
-This document guides the public, self-hosted BuildFlow Local experience only.
+This document guides the public, self-hosted Mastermind Local experience only.
 
 ## Product design goal
 
-BuildFlow Local should feel like a compact local AI workbench for moving from context to safe execution.
+Mastermind Local should feel like a compact local AI companion for moving from context to safe execution.
 
 The dashboard should make the user feel:
 
-- BuildFlow knows which sources are connected
-- BuildFlow understands the current project context
-- BuildFlow can show the active plan or execution packet
-- BuildFlow knows the next useful action
-- BuildFlow can help continue or resume work without terminal anxiety
+- Mastermind knows which sources are connected
+- Mastermind understands the current project context
+- Mastermind can show the active plan or execution packet
+- Mastermind knows the next useful action
+- Mastermind can help continue or resume work without terminal anxiety
 
 ## Design direction
 
@@ -26,7 +26,7 @@ Use this direction:
 
 ## Dashboard target visual
 
-The current target dashboard is the generated three-panel BuildFlow mockup with:
+The current target dashboard is the generated three-panel Mastermind mockup with:
 
 1. **Overview dashboard**
    - compact greeting/summary header
@@ -49,7 +49,7 @@ The current target dashboard is the generated three-panel BuildFlow mockup with:
 
 Implementation rules for this target:
 
-- keep the existing BuildFlow Local routes, actions, and data contracts intact
+- keep the existing Mastermind Local routes, actions, and data contracts intact
 - keep the Codex/ChatGPT-style app shell with left rail, main workspace, and right inspector
 - make dashboard pages visually richer through real local data, not decorative filler
 - use compact cards and rows, not oversized panels
@@ -82,7 +82,7 @@ Avoid:
 
 ## Core dashboard rule: no page scroll
 
-The BuildFlow dashboard is a dashboard, not a scrolling website.
+The Mastermind dashboard is a dashboard, not a scrolling website.
 
 The main `/dashboard` page should fit within the viewport and should not require vertical page scrolling during normal use.
 
@@ -112,7 +112,7 @@ Implementation implication:
 The first screen should answer, in this order:
 
 1. What is connected?
-2. Is BuildFlow healthy?
+2. Is Mastermind healthy?
 3. What project or workspace am I in?
 4. What plan or execution packet is active?
 5. What should I do next?
@@ -126,7 +126,7 @@ The user should not need to scan a wall of widgets to understand the next step.
 Recommended desktop layout:
 
 1. Top bar
-   - BuildFlow identity
+   - Mastermind identity
    - current dashboard section
    - compact agent/source/write status
    - light/dark mode toggle
@@ -162,9 +162,9 @@ Recommended desktop layout:
 
 The default view should fit in one viewport without page scroll.
 
-## BuildFlow Local scope
+## Mastermind Local scope
 
-The public BuildFlow repo is Local-only.
+The public Mastermind repo is Local-only.
 
 Include:
 
@@ -185,7 +185,7 @@ Do not include:
 - managed product messaging
 - cloud sync
 - aggressive upsells
-- future roadmap text that is not part of BuildFlow Local
+- future roadmap text that is not part of Mastermind Local
 
 ## Visual principles
 

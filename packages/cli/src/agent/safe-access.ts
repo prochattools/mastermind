@@ -1,7 +1,7 @@
 import fs from 'fs'
 import path from 'path'
 import { execFileSync } from 'child_process'
-import { getActiveSourceContext, getEnabledSources, loadConfig } from './config'
+import { getActiveSourceContext, getEnabledSources, loadConfig, resolveConfiguredSourceId } from './config'
 import { containsProtectedRepositoryContent, evaluateConnectedRepositoryPath } from '@mastermind/shared'
 
 export type WriteChangeType =
@@ -772,7 +772,8 @@ export function getSourceRoot(sourceId?: string): { id: string; path: string } {
   const sources = getEnabledSources({ includeIndexState: false })
   if (sources.length === 0) throw new Error('No enabled knowledge sources configured')
   if (sourceId) {
-    const source = sources.find(s => s.id === sourceId)
+    const resolvedSourceId = resolveConfiguredSourceId(sourceId, sources)
+    const source = sources.find(s => s.id === resolvedSourceId)
     if (!source) throw new Error(`Source not found: ${sourceId}`)
     return { id: source.id, path: source.path }
   }
@@ -783,7 +784,8 @@ export function resolveTargetSourceId(sourceId?: string): string {
   const active = getActiveSourceContext()
   const enabled = getEnabledSources({ includeIndexState: false })
   if (sourceId) {
-    const source = enabled.find(s => s.id === sourceId)
+    const resolvedSourceId = resolveConfiguredSourceId(sourceId, enabled)
+    const source = enabled.find(s => s.id === resolvedSourceId)
     if (!source) throw new Error(`Source not found: ${sourceId}`)
     return source.id
   }
@@ -796,7 +798,7 @@ export function resolveTargetSourceId(sourceId?: string): string {
 export function getResolvedActiveSources(sourceIds?: string[]): Array<{ id: string; path: string }> {
   if (sourceIds && sourceIds.length > 0) {
     const enabled = getEnabledSources({ includeIndexState: false })
-    const wanted = new Set(sourceIds)
+    const wanted = new Set(sourceIds.map(sourceId => resolveConfiguredSourceId(sourceId, enabled)))
     const resolved = enabled.filter(source => wanted.has(source.id)).map(source => ({ id: source.id, path: source.path }))
     if (resolved.length === 0) throw new Error('No matching active sources found')
     return resolved

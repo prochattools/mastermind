@@ -1,7 +1,7 @@
 import type { KnowledgeSource, ActiveSourcesMode, WriteMode } from '@mastermind/shared'
 
 export function getAgentHealthLabel(agentConnected: boolean): string {
-  return agentConnected ? 'Agent connected' : 'Agent disconnected'
+  return agentConnected ? 'System healthy' : 'System offline'
 }
 
 export function getAgentHealthClassName(agentConnected: boolean): string {

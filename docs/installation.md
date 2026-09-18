@@ -1,7 +1,8 @@
 # Install Mastermind
 
-Mastermind is source-distributed. This guide covers the supported local
-dashboard/CLI path, the native macOS path, and Custom GPT setup.
+Mastermind is source-distributed. The normal macOS experience is the passive
+menu-bar companion; this guide also covers its advanced dashboard/CLI paths
+and Custom GPT setup.
 
 ## Prerequisites
 
@@ -23,19 +24,22 @@ pnpm --dir packages/cli type-check
 The CLI package exposes `mastermind`. `workbench` and `buildflow` remain
 compatibility aliases for existing installations.
 
-## Local runtime
+## Advanced local runtime
 
-Start and verify the local dashboard/runtime from the repository root:
+Start and verify the local dashboard/runtime from the repository root when
+advanced workspace or support access is needed:
 
 ```bash
 pnpm local:start
 pnpm local:verify
 ```
 
-The runtime stores source configuration and operational state locally. Use the
-CLI or dashboard to register a source, then let indexing complete before
-using it for context-heavy work. A stale index is a navigation aid, not proof
-that a file is current.
+The runtime stores source configuration and operational state locally. On the
+native macOS path, repository/worktree discovery and indexing are automatic;
+routine users do not manually activate repositories or press an Index button.
+The dashboard and CLI remain available for advanced administration and
+diagnostics. A stale index is a navigation aid, not proof that a file is
+current.
 
 ## Native macOS path
 
@@ -73,9 +77,10 @@ Use this canonical endpoint for the current public deployment:
 https://mastermind.prochat.tools
 ```
 
-`https://workbench.prochat.tools` is retained only for existing compatibility
-configurations. ChatGPT must be able to reach the configured server over HTTPS;
-localhost is for local inspection and local clients.
+`https://workbench.prochat.tools` is retired. Workbench source and session
+identifiers remain logical compatibility aliases inside the canonical service.
+ChatGPT must be able to reach the configured server over HTTPS; localhost is
+for local inspection and local clients.
 
 ## First safe operation
 

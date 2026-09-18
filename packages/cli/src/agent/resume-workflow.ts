@@ -58,7 +58,7 @@ export function evaluateResumeWorkflow(input: ResumeWorkflowInput): ResumeWorkfl
   if (run.status === 'needs_confirmation' || run.requiresConfirmation) {
     return { eligible: false, reason: 'confirmation_required', nextAction: 'Resolve the explicit confirmation requirement.', projection, rebuiltProjection }
   }
-  if (run.status === 'blocked') {
+  if (run.status === 'blocked' && run.blockedDisposition !== 'resumable') {
     return { eligible: false, reason: 'blocked_run', nextAction: projection.nextAction || 'Resolve the persisted blocker.', projection, rebuiltProjection }
   }
 

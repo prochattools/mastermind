@@ -74,6 +74,22 @@ export type KnowledgeSource = {
   lastIndexedAt?: string
   indexError?: string
   indexFailureCode?: 'FAILED_DEPTH' | 'FAILED_BUDGET' | 'FAILED_IO' | 'STALE_POLICY' | 'RECONCILIATION_REQUIRED'
+  sourceRevision?: string
+  observedRevision?: string
+  sourceBranchName?: string
+  observedBranchName?: string
+  sourceWorktreeIdentity?: string
+  observedWorktreeIdentity?: string
+  indexGeneration?: string
+  indexSchemaVersion?: string
+  freshnessState?: 'discovered' | 'preparing' | 'ready' | 'stale' | 'refreshing' | 'needs_attention' | 'unavailable'
+  refreshReason?: string
+  changedPathCount?: number
+  lastRefreshFailureAt?: string
+  retryCount?: number
+  retryAfterAt?: string
+  availabilityStatus?: 'discovered' | 'preparing' | 'ready' | 'needs_attention' | 'unavailable' | 'stale' | 'removed'
+  availabilityReason?: string
   autoIndexEnabled?: boolean
   autoIndexIntervalMinutes?: number
   lastAutoIndexedAt?: string
@@ -99,6 +115,8 @@ export type DiscoveredRepository = {
 
 export type SourceDiscoverySettings = {
   rootPath?: string
+  /** Additional bounded roots; rootPath remains the compatibility primary root. */
+  rootPaths?: string[]
   allowedRoots?: string[]
   ignorePatterns?: string[]
   namingPattern?: string
@@ -112,6 +130,7 @@ export type SourceDiscoveryTelemetry = {
   maxDepth: number
   resultsEmitted: number
   terminationReason: 'completed' | 'depth_limit' | 'entries_limit' | 'result_limit'
+  worktreesDiscovered?: number
 }
 
 export type ActiveSourcesMode = 'single' | 'multi' | 'all'

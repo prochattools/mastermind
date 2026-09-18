@@ -1,17 +1,17 @@
 import type { ReactNode } from 'react'
 
 type DashboardShellProps = {
-  leftRail: ReactNode
-  mainContent: ReactNode
-  rightPanel: ReactNode
+  children: ReactNode
+  mobileNavigation?: ReactNode
 }
 
-export function DashboardShell({ leftRail, mainContent, rightPanel }: DashboardShellProps) {
+export function DashboardShell({ children, mobileNavigation }: DashboardShellProps) {
   return (
-    <div className="grid flex-1 min-h-0 overflow-hidden bg-bf-bg xl:grid-cols-[15.75rem_minmax(0,1fr)_17.5rem] 2xl:grid-cols-[16.5rem_minmax(0,1fr)_18.5rem]">
-      {leftRail}
-      {mainContent}
-      {rightPanel}
-    </div>
+    <>
+      <div className="grid min-h-0 flex-1 overflow-hidden bg-mm-canvas lg:grid-cols-[15rem_minmax(0,1fr)] xl:grid-cols-[15.75rem_minmax(0,1fr)_17.5rem] 2xl:grid-cols-[16.5rem_minmax(0,1fr)_18.5rem]">
+        {children}
+      </div>
+      {mobileNavigation}
+    </>
   )
 }

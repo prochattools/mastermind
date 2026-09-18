@@ -86,6 +86,7 @@ export function startLocalAgentPreflight(options: LocalAgentRuntimeOptions): voi
         if (result.status !== 'completed') {
           updateAgentJob(jobId, {
             status: 'blocked',
+            blockedDisposition: 'resumable',
             blockedReason: `Local preflight stopped at ${command.kind}: ${result.status}`,
             summary: evidence.join('; '),
             lastKnownGitStatus: result.stdout || result.stderr || result.reason || 'No command output.',

@@ -5,6 +5,7 @@ import { getConfigDir } from '../utils/paths'
 import type { IndexScanFailureCode } from './index-scan-policy'
 
 export type SourceIndexStatus = 'ready' | 'pending' | 'indexing' | 'failed' | 'disabled' | 'unknown'
+export type SourceFreshnessState = 'discovered' | 'preparing' | 'ready' | 'stale' | 'refreshing' | 'needs_attention' | 'unavailable'
 
 export type SourceIndexRecord = {
   indexed?: boolean
@@ -16,11 +17,23 @@ export type SourceIndexRecord = {
   indexError?: string
   indexFailureCode?: IndexScanFailureCode
   sourceRevision?: string
+  observedRevision?: string
+  sourceBranchName?: string
+  observedBranchName?: string
   sourcePathIdentity?: string
   sourceWorktreeIdentity?: string
+  observedWorktreeIdentity?: string
   indexPolicyVersion?: string
   indexExclusionVersion?: string
   indexPolicyIdentity?: string
+  indexSchemaVersion?: string
+  indexGeneration?: string
+  freshnessState?: SourceFreshnessState
+  refreshReason?: string
+  changedPathCount?: number
+  lastRefreshFailureAt?: string
+  retryCount?: number
+  retryAfterAt?: string
   discoveredAt?: string
   queuedAt?: string
   indexingAt?: string

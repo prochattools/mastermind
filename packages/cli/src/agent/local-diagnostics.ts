@@ -36,11 +36,15 @@ export function collectLocalDiagnostics(context: LocalDiagnosticsRequestContext 
     indexingSources: sources.filter(source => source.indexStatus === 'indexing').length,
     failedSources: sources.filter(source => source.indexStatus === 'failed').length,
     disabledSources: sources.filter(source => source.indexStatus === 'disabled').length,
+    staleSources: sources.filter(source => source.freshnessState === 'stale').length,
+    refreshingSources: sources.filter(source => source.freshnessState === 'refreshing' || source.indexStatus === 'indexing').length,
+    needsAttentionSources: sources.filter(source => source.freshnessState === 'needs_attention' || source.indexStatus === 'failed').length,
     sourceIdsByStatus: {
       ready: sources.filter(source => source.indexStatus === 'ready').map(source => source.id),
       pending: sources.filter(source => source.indexStatus === 'pending').map(source => source.id),
       indexing: sources.filter(source => source.indexStatus === 'indexing').map(source => source.id),
-      failed: sources.filter(source => source.indexStatus === 'failed').map(source => source.id)
+      failed: sources.filter(source => source.indexStatus === 'failed').map(source => source.id),
+      stale: sources.filter(source => source.freshnessState === 'stale').map(source => source.id)
     }
   }
   const queue = collectIndexQueueDiagnostics({ sources })
